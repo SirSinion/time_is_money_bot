@@ -18,7 +18,24 @@ class users_manager:
         self.users.append(new_user)
 
     def transfer(self, user_from, user_to, val):
-        for i in self.users
+        
+        for user in self.users:
+            if user.get_name() == user_from:
+                user_from = user
+            elif user.get_name() == user_to:
+                user_to = user
+        if type(user_to) is str:
+            raise ValueError("Пользователь не найден")
+        elif type(user_from) is str:
+            raise ValueError("Ты кто блять?!?!")
+        else:
+            try:
+                user_from.change_capital(-val)
+            except ValueError:
+                raise ValueError("Нехвадка средств")
+            user_to.change_capital(val)
+            
+     
         
 
 

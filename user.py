@@ -1,10 +1,10 @@
 from sql_worker import sql_worker
 from config import USERS_TABLE_NAME
+
 class user:
 
     def _upload(self):
-        for i, j in enumerate(self.info):
-            self.sql_worker.change(self.table,{ "user_id" : self.info["user_id"] }, self.info)
+        self.sql_worker.change(self.table,{ "user_id" : self.info["user_id"] }, self.info)
 
     def change_capital(self, value):
         if self.info['capital'] + value < 0 and self.info['is_admin'] == 0:
