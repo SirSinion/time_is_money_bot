@@ -7,7 +7,7 @@ bot = telebot.TeleBot(token)
 
 @bot.message_handler(commands=['start'])
 def start_message(message):
-    conn = sqlite3.connect('main.db')
+    conn = sqlite3.connect('game.db')
     cur = conn.cursor()
 
     cur.execute('CREATE TABLE IF NOT EXISTS users(id INTEGER PRIMARY KEY AUTOINCREMENT, name varchar(50))')
