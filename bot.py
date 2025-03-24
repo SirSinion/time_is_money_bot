@@ -8,7 +8,7 @@ me = 807802225
 MAIN_ADMIN_ID = 111111  # Замените на реальный Telegram ID главного админа
 
 # Список ID администраторов
-admins = [me, 333333333]  # Добавьте ID обычных админов
+admins = [333333333]  # Добавьте ID обычных админов
 
 # Массив команд для пользователей (можно добавлять и удалять)
 commands = ['Команда 1', 'Команда 2', 'Команда 3', 'Команда 4']
@@ -34,8 +34,14 @@ def main_admin_menu():
     markup.add('Добавить команду', 'Удалить команду', 'Главное меню')
     return markup
 
-# Функция для меню выбора действия (перевод и т.д.)
-def action_menu():
+# Функция для меню выбора действия акций (перевод и т.д.)
+def action_action_menu():
+    markup = types.ReplyKeyboardMarkup(one_time_keyboard=True)
+    markup.add('Перевод', 'Главное меню')
+    return markup
+
+# Функция для меню выбора действия баланса (перевод и т.д.)
+def balance_action_menu():
     markup = types.ReplyKeyboardMarkup(one_time_keyboard=True)
     markup.add('Перевод', 'Главное меню')
     return markup
@@ -75,15 +81,28 @@ def back_to_user_action_menu(message):
     bot.send_message(message.chat.id, 'Что бы вы хотели сделать?', reply_markup=user_action_menu())
 
 # Хендлер для выбора действия внутри "Баланс" или "Акции"
-@bot.message_handler(func=lambda message: message.text in ['Баланс', 'Акции'])
+@bot.message_handler(func=lambda message: message.text == 'Баланс')
 def balance_or_promotions(message):
     bot.send_message(message.chat.id, f'Вы выбрали: {message.text}')
-    bot.send_message(message.chat.id, f'Что бы вы хотели сделать с {message.text.lower()}?', reply_markup=action_menu())
+    bot.send_message(message.chat.id, f'Что бы вы хотели сделать с {message.text.lower()}?', reply_markup=balance_action_menu())
+
+@bot.message_handler(func=lambda message: message.text == 'Акции')
+def balance_or_promotions(message):
+    bot.send_message(message.chat.id, f'Вы выбрали: {message.text}')
+    bot.send_message(message.chat.id, f'Что бы вы хотели сделать с {message.text.lower()}?', reply_markup=action_action_menu())
+    
+
+    
 
 # Хендлер для действия "Перевод"
 @bot.message_handler(func=lambda message: message.text == 'Перевод')
 def transfer(message):
-    bot.send_message(message.chat.id, 'Перевод выполнен!')
+    bot.send_message(message.chat.id, 'Введите команду, размер перевода и процент при бафах/дебафов (_Команду_ _Размер_ _процент(опционально)_)')
+    bot.register_next_step_handler(message, money_transfer)
+
+def money_transfer(message):
+    bot.send_message(message.chat.id, f'Перевод выполнен!', reply_markup=user_action_menu())
+    
 
 # Хендлер для выбора станции (для администраторов)
 @bot.message_handler(func=lambda message: message.text in stations)
@@ -95,6 +114,7 @@ def admin_station(message):
 @bot.message_handler(func=lambda message: message.text == 'Переводы')
 def admin_transfer(message):
     bot.send_message(message.chat.id, 'Перевод админом выполнен!', reply_markup=admin_menu())
+
 
 # Хендлер для "Главного меню"
 @bot.message_handler(func=lambda message: message.text == 'Главное меню')
