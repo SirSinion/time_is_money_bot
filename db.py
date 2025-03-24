@@ -78,6 +78,7 @@ def create_database():
     conn.close()
     print("База данных успешно создана!")
 
+
 def connect_db() -> Tuple[sqlite3.Connection, sqlite3.Cursor]:
     """Создает подключение к базе данных и возвращает соединение и курсор"""
     conn = sqlite3.connect('game.db')
@@ -91,7 +92,54 @@ def close_db(conn: sqlite3.Connection, commit: bool = True) -> None:
         conn.commit()
     conn.close()
 
-#Добавление комманды
+
+def get_all_commands() -> list:
+    """
+    Получает список всех команд из базы данных.
+
+    Returns:
+        Список названий команд
+    """
+    conn = sqlite3.connect('game.db')
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("SELECT name_command FROM commands")
+        commands = [row[0] for row in cursor.fetchall()]
+        return commands
+
+    except sqlite3.Error as e:
+        print(f"Ошибка при получении списка команд: {e}")
+        return []
+
+    finally:
+        conn.close()
+
+
+def get_all_stations() -> list:
+    """
+    Получает список всех станций из базы данных.
+
+    Returns:
+        Список названий станций
+    """
+    conn = sqlite3.connect('game.db')
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("SELECT name FROM stations")
+        stations = [row[0] for row in cursor.fetchall()]
+        return stations
+
+    except sqlite3.Error as e:
+        print(f"Ошибка при получении списка станций: {e}")
+        return []
+
+    finally:
+        conn.close()
+
+
+# Добавление команды
 def add_command(name_command: str, initial_balance: int = 0) -> int:
     """
     Добавляет новую команду в базу данных.
@@ -128,6 +176,113 @@ def add_command(name_command: str, initial_balance: int = 0) -> int:
     except Exception as e:
         conn.rollback()
         raise e
+
+    finally:
+        conn.close()
+
+
+def add_user(username: str, command_id: int) -> int:
+    """
+    Добавляет нового пользователя в базу данных.
+
+    Args:
+        username: Имя пользователя
+        command_id: ID команды, к которой присоединяется пользователь
+
+    Returns:
+        ID созданного пользователя
+    """
+    conn = sqlite3.connect('game.db')
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("INSERT INTO users (username, command_id) VALUES (?, ?)", (username, command_id))
+        user_id = cursor.lastrowid
+        conn.commit()
+        return user_id
+
+    except Exception as e:
+        conn.rollback()
+        raise e
+
+    finally:
+        conn.close()
+
+
+def get_command_id_by_name(command_name: str) -> Optional[int]:
+    """
+    Получает ID команды по её названию.
+
+    Args:
+        command_name: Название команды
+
+    Returns:
+        ID команды или None, если команда не найдена
+    """
+    conn = sqlite3.connect('game.db')
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("SELECT command_id FROM commands WHERE name_command = ?", (command_name,))
+        result = cursor.fetchone()
+        return result[0] if result else None
+
+    except sqlite3.Error as e:
+        print(f"Ошибка при получении ID команды: {e}")
+        return None
+
+    finally:
+        conn.close()
+
+def get_user_by_username(username: str) -> Optional[Tuple[int, int]]:
+    """
+    Получает информацию о пользователе по его имени.
+
+    Args:
+        username: Имя пользователя
+
+    Returns:
+        Кортеж (user_id, command_id) или None, если пользователь не найден
+    """
+    conn = sqlite3.connect('game.db')
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("SELECT user_id, command_id FROM users WHERE username = ?", (username,))
+        result = cursor.fetchone()
+        return result if result else None
+
+    except sqlite3.Error as e:
+        print(f"Ошибка при получении информации о пользователе: {e}")
+        return None
+
+    finally:
+        conn.close()
+
+
+def update_user_command(user_id: int, command_id: int) -> bool:
+    """
+    Обновляет команду пользователя.
+
+    Args:
+        user_id: ID пользователя
+        command_id: Новый ID команды
+
+    Returns:
+        True, если обновление прошло успешно, иначе False
+    """
+    conn = sqlite3.connect('game.db')
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("UPDATE users SET command_id = ? WHERE user_id = ?", (command_id, user_id))
+        conn.commit()
+        return True
+
+    except sqlite3.Error as e:
+        print(f"Ошибка при обновлении команды пользователя: {e}")
+        conn.rollback()
+        return False
 
     finally:
         conn.close()
