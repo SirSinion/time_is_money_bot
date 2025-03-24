@@ -91,8 +91,166 @@ def close_db(conn: sqlite3.Connection, commit: bool = True) -> None:
         conn.commit()
     conn.close()
 
+#Добавление комманды
+def add_command(name_command: str, initial_balance: int = 0) -> int:
+    """
+    Добавляет новую команду в базу данных.
+
+    Args:
+        name_command: Название команды
+        initial_balance: Начальный баланс команды (по умолчанию 0)
+
+    Returns:
+        ID созданной команды
+    """
+    conn = sqlite3.connect('game.db')
+    cursor = conn.cursor()
+
+    try:
+        # Проверяем, существует ли уже команда с таким названием
+        cursor.execute("SELECT command_id FROM commands WHERE name_command = ?", (name_command,))
+        existing_command = cursor.fetchone()
+
+        if existing_command:
+            raise ValueError(f"Команда с названием '{name_command}' уже существует")
+
+        # Добавляем новую команду
+        cursor.execute(
+            "INSERT INTO commands (name_command, balance) VALUES (?, ?)",
+            (name_command, initial_balance)
+        )
+
+        # Получаем ID созданной команды
+        command_id = cursor.lastrowid
+        conn.commit()
+        return command_id
+
+    except Exception as e:
+        conn.rollback()
+        raise e
+
+    finally:
+        conn.close()
+
 
 # Функции для работы с балансом
+def add_user(username: str, command_id: Optional[int] = None) -> int:
+    """
+    Добавляет нового пользователя в базу данных.
+
+    Args:
+        username: Имя пользователя
+        command_id: ID команды, к которой будет привязан пользователь
+
+    Returns:
+        ID созданного пользователя
+    """
+    conn = sqlite3.connect('game.db')
+    cursor = conn.cursor()
+
+    try:
+        # Если command_id не указан, пользователь добавляется без команды
+        if command_id is None:
+            cursor.execute(
+                "INSERT INTO users (username) VALUES (?)",
+                (username,)
+            )
+        else:
+            # Проверяем, существует ли команда с указанным ID
+            cursor.execute("SELECT command_id FROM commands WHERE command_id = ?", (command_id,))
+            if not cursor.fetchone():
+                raise ValueError(f"Команда с ID {command_id} не существует")
+
+            cursor.execute(
+                "INSERT INTO users (username, command_id) VALUES (?, ?)",
+                (username, command_id)
+            )
+
+        # Получаем ID созданного пользователя
+        user_id = cursor.lastrowid
+        conn.commit()
+        return user_id
+
+    except Exception as e:
+        conn.rollback()
+        raise e
+
+    finally:
+        conn.close()
+
+
+def add_user_to_command(user_id: int, command_id: int) -> bool:
+    """
+    Добавляет существующего пользователя в команду.
+
+    Args:
+        user_id: ID пользователя
+        command_id: ID команды
+
+    Returns:
+        True, если пользователь успешно добавлен в команду, иначе False
+    """
+    conn = sqlite3.connect('game.db')
+    cursor = conn.cursor()
+
+    try:
+        # Проверяем, существует ли пользователь
+        cursor.execute("SELECT user_id FROM users WHERE user_id = ?", (user_id,))
+        if not cursor.fetchone():
+            print(f"Пользователь с ID {user_id} не существует")
+            return False
+
+        # Проверяем, существует ли команда
+        cursor.execute("SELECT command_id FROM commands WHERE command_id = ?", (command_id,))
+        if not cursor.fetchone():
+            print(f"Команда с ID {command_id} не существует")
+            return False
+
+        # Обновляем команду пользователя
+        cursor.execute(
+            "UPDATE users SET command_id = ? WHERE user_id = ?",
+            (command_id, user_id)
+        )
+
+        conn.commit()
+        return True
+
+    except Exception as e:
+        conn.rollback()
+        print(f"Ошибка при добавлении пользователя в команду: {e}")
+        return False
+
+    finally:
+        conn.close()
+
+
+def get_user_info(user_id: int) -> Optional[Tuple]:
+    """
+    Получает информацию о пользователе по его ID.
+
+    Args:
+        user_id: ID пользователя
+
+    Returns:
+        Кортеж с информацией о пользователе или None, если пользователь не найден
+    """
+    conn = sqlite3.connect('game.db')
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("""
+            SELECT u.user_id, u.username, u.command_id, c.name_command 
+            FROM users u
+            LEFT JOIN commands c ON u.command_id = c.command_id
+            WHERE u.user_id = ?
+        """, (user_id,))
+
+        user_info = cursor.fetchone()
+        return user_info
+
+    finally:
+        conn.close()
+
 
 def add_balance(command_id: int, amount: int) -> bool:
     """
