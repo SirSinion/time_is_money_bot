@@ -5,18 +5,14 @@ from telebot import types
 from bot import balance_action_menu, action_action_menu
 from config import TOKEN
 from db import add_user, get_all_commands, get_all_stations, get_command_id_by_name, get_user_by_username, \
-<<<<<<< HEAD
-    update_user_command, get_command_info, format_command_info
-=======
     update_user_command, get_command_info, format_command_info, get_balance, get_user_command_id, get_command_name_by_id
->>>>>>> 9e739cf51af0ef6b483afe00e866f09e07819d7f
 
 commands = get_all_commands()
 bot = telebot.TeleBot(TOKEN)
 stations = get_all_stations()
 # Список ID администраторов
 me = 807802225
-admins = [me, 987654321]
+admins = [ 987654321]
 
 
 # Функция для создания меню пользователя
@@ -45,50 +41,6 @@ def main_menu(chat_id):
     markup = user_action_menu()
     bot.send_message(chat_id, 'Главное меню:', reply_markup=markup)
 
-<<<<<<< HEAD
-# Функция для меню выбора действия акций (перевод и т.д.)
-def action_action_menu():
-    markup = types.ReplyKeyboardMarkup(one_time_keyboard=True)
-    markup.add('Перевод', 'Главное меню')
-    return markup
-
-# Функция для меню выбора действия баланса (перевод и т.д.)
-def balance_action_menu():
-    markup = types.ReplyKeyboardMarkup(one_time_keyboard=True)
-    markup.add('Перевод', 'Главное меню')
-    return markup
-
-# Хендлер для команды /start
-@bot.message_handler(commands=['start'])
-def start(message):
-    if message.from_user.id in admins:
-        # Если пользователь админ, показываем список станций
-        stations = get_all_stations()
-        markup = types.ReplyKeyboardMarkup(one_time_keyboard=True)
-        for station in stations:
-            item = types.KeyboardButton(station)
-            markup.add(item)
-        markup.add('Главное меню')
-        bot.send_message(message.chat.id, 'Выберите станцию:', reply_markup=markup)
-    else:
-        # Если пользователь не админ, показываем список команд из базы данных
-        commands = get_all_commands()
-
-        if not commands:
-            bot.send_message(message.chat.id,
-                             'В базе данных нет доступных команд. Пожалуйста, обратитесь к администратору.')
-            return
-
-        markup = types.ReplyKeyboardMarkup(one_time_keyboard=True)
-        for command in commands:
-            item = types.KeyboardButton(command)
-            markup.add(item)
-        markup.add('Главное меню')
-        bot.send_message(message.chat.id, 'Выберите команду:', reply_markup=markup)
-        # Регистрируем следующий шаг - обработка выбора команды
-        bot.register_next_step_handler(message, process_command_selection)
-=======
->>>>>>> 9e739cf51af0ef6b483afe00e866f09e07819d7f
 def process_command_selection(message):
     selected_command = message.text
     # Получаем список команд из базы данных
@@ -308,7 +260,6 @@ def balance_handler(message):
     # Показываем меню действий с балансом
     bot.send_message(message.chat.id, f'Что бы вы хотели сделать с балансом?', reply_markup=balance_action_menu())
 
-<<<<<<< HEAD
 # Хендлер для выбора действия внутри "Баланс" или "Акции"
 @bot.message_handler(func=lambda message: message.text == 'Баланс')
 def balance_or_promotions(message):
@@ -320,15 +271,6 @@ def balance_or_promotions(message):
     bot.send_message(message.chat.id, f'Вы выбрали: {message.text}')
     bot.send_message(message.chat.id, f'Что бы вы хотели сделать с {message.text.lower()}?', reply_markup=action_action_menu())
  
-=======
-
-# Хендлер для выбора действия внутри "Акции"
-@bot.message_handler(func=lambda message: message.text == 'Акции')
-def promotions_handler(message):
-    bot.send_message(message.chat.id, f'Вы выбрали: {message.text}')
-    bot.send_message(message.chat.id, f'Что бы вы хотели сделать с акциями?', reply_markup=action_action_menu())
-
->>>>>>> 9e739cf51af0ef6b483afe00e866f09e07819d7f
 
 #TODO:
 # Хендлер для действия "Перевод" (для пользователей)
@@ -336,20 +278,11 @@ def promotions_handler(message):
 # Хендлер для действия "Перевод"
 @bot.message_handler(func=lambda message: message.text == 'Перевод')
 def transfer(message):
-<<<<<<< HEAD
     bot.send_message(message.chat.id, 'Введите команду, размер перевода')
-=======
-    bot.send_message(message.chat.id,
-                     'Введите команду, размер перевода и процент при бафах/дебафов (_Команду_ _Размер_ _процент(опционально)_)')
->>>>>>> 9e739cf51af0ef6b483afe00e866f09e07819d7f
     bot.register_next_step_handler(message, money_transfer)
 
 def money_transfer(message):
     bot.send_message(message.chat.id, f'Перевод выполнен!', reply_markup=user_action_menu())
-<<<<<<< HEAD
-=======
-
->>>>>>> 9e739cf51af0ef6b483afe00e866f09e07819d7f
 
 # Хендлер для действия "Переводы" (для администраторов)
 @bot.message_handler(func=lambda message: message.text == 'Переводы')

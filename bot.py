@@ -92,8 +92,6 @@ def balance_or_promotions(message):
     bot.send_message(message.chat.id, f'Что бы вы хотели сделать с {message.text.lower()}?', reply_markup=action_action_menu())
     
 
-    
-
 # Хендлер для действия "Перевод"
 @bot.message_handler(func=lambda message: message.text == 'Перевод')
 def transfer(message):
