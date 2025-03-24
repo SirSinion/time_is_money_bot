@@ -556,6 +556,56 @@ def add_balance(command_id: int, amount: int) -> bool:
         return False
 
 
+def get_user_command_id(user_id: int) -> Optional[int]:
+    """
+    Получает ID команды, в которой состоит пользователь
+
+    Args:
+        user_id: ID пользователя
+
+    Returns:
+        ID команды или None, если пользователь не состоит в команде
+    """
+    conn, cursor = connect_db()
+
+    try:
+        cursor.execute("SELECT command_id FROM users WHERE user_id = ?", (user_id,))
+        result = cursor.fetchone()
+
+        close_db(conn, commit=False)
+        return result[0] if result else None
+
+    except Exception as e:
+        print(f"Ошибка при получении ID команды пользователя: {e}")
+        close_db(conn, commit=False)
+        return None
+
+
+def get_command_name_by_id(command_id: int) -> Optional[str]:
+    """
+    Получает название команды по её ID
+
+    Args:
+        command_id: ID команды
+
+    Returns:
+        Название команды или None, если команда не найдена
+    """
+    conn, cursor = connect_db()
+
+    try:
+        cursor.execute("SELECT name_command FROM commands WHERE command_id = ?", (command_id,))
+        result = cursor.fetchone()
+
+        close_db(conn, commit=False)
+        return result[0] if result else None
+
+    except Exception as e:
+        print(f"Ошибка при получении названия команды: {e}")
+        close_db(conn, commit=False)
+        return None
+
+
 def get_balance(command_id: int) -> Optional[int]:
     """
     Получает текущий баланс команды

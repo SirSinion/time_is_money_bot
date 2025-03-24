@@ -1,9 +1,10 @@
 import sqlite3
 import telebot
 from telebot import types
+
+from bot import balance_action_menu, action_action_menu
 from config import TOKEN
-from db import add_user, get_all_commands, get_all_stations, get_command_id_by_name, get_user_by_username, \
-    update_user_command, get_command_info, format_command_info
+from db import add_user, get_all_commands, get_all_stations, get_command_id_by_name, get_user_by_username, update_user_command
 
 commands = get_all_commands()
 bot = telebot.TeleBot(TOKEN)
@@ -39,17 +40,6 @@ def main_menu(chat_id):
     markup = user_action_menu()
     bot.send_message(chat_id, 'Главное меню:', reply_markup=markup)
 
-# Функция для меню выбора действия акций (перевод и т.д.)
-def action_action_menu():
-    markup = types.ReplyKeyboardMarkup(one_time_keyboard=True)
-    markup.add('Перевод', 'Главное меню')
-    return markup
-
-# Функция для меню выбора действия баланса (перевод и т.д.)
-def balance_action_menu():
-    markup = types.ReplyKeyboardMarkup(one_time_keyboard=True)
-    markup.add('Перевод', 'Главное меню')
-    return markup
 
 # Хендлер для команды /start
 @bot.message_handler(commands=['start'])
@@ -263,29 +253,26 @@ def user_command(message):
     bot.send_message(message.chat.id, 'Что бы вы хотели сделать?', reply_markup=user_action_menu())
 
 
+
 # Хендлер для выбора действия внутри "Баланс" или "Акции"
-@bot.message_handler(func=lambda message: message.text == 'Баланс')
+@bot.message_handler(func=lambda message: message.text in ['Баланс', 'Акции'])
 def balance_or_promotions(message):
-    bot.send_message(message.chat.id, f'Вы выбрали: {message.text}')
-    bot.send_message(message.chat.id, f'Что бы вы хотели сделать с {message.text.lower()}?', reply_markup=balance_action_menu())
+    selected_action = message.text
+    bot.send_message(message.chat.id, f'Вы выбрали: {selected_action}')
 
-@bot.message_handler(func=lambda message: message.text == 'Акции')
-def balance_or_promotions(message):
-    bot.send_message(message.chat.id, f'Вы выбрали: {message.text}')
-    bot.send_message(message.chat.id, f'Что бы вы хотели сделать с {message.text.lower()}?', reply_markup=action_action_menu())
- 
+    # Добавляем кнопку "Перевод" внутри разделов "Баланс" и "Акции"
+    bot.send_message(message.chat.id, f'Что бы вы хотели сделать с {selected_action.lower()}?', reply_markup=action_menu())
 
-#TODO:
 # Хендлер для действия "Перевод" (для пользователей)
 
 # Хендлер для действия "Перевод"
 @bot.message_handler(func=lambda message: message.text == 'Перевод')
 def transfer(message):
-    bot.send_message(message.chat.id, 'Введите команду, размер перевода')
-    bot.register_next_step_handler(message, money_transfer)
 
-def money_transfer(message):
-    bot.send_message(message.chat.id, f'Перевод выполнен!', reply_markup=user_action_menu())
+
+
+    bot.send_message(message.chat.id, 'Перевод выполнен!')
+
 
 # Хендлер для действия "Переводы" (для администраторов)
 @bot.message_handler(func=lambda message: message.text == 'Переводы')
@@ -304,7 +291,6 @@ def admin_station(message):
 
     # Показываем кнопку "Переводы" после выбора станции
     bot.send_message(message.chat.id, 'Что бы вы хотели сделать?', reply_markup=admin_menu())
-
 
 # Хендлер для кнопки "Команда" — возвращаем пользователя в меню действий
 @bot.message_handler(func=lambda message: message.text == 'Команда')
