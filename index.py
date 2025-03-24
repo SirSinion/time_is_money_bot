@@ -1,9 +1,11 @@
 import sqlite3
 import telebot
 from telebot import types
+
+from bot import balance_action_menu, action_action_menu
 from config import TOKEN
 from db import add_user, get_all_commands, get_all_stations, get_command_id_by_name, get_user_by_username, \
-    update_user_command, get_command_info, format_command_info
+    update_user_command, get_command_info, format_command_info, get_balance, get_user_command_id, get_command_name_by_id
 
 commands = get_all_commands()
 bot = telebot.TeleBot(TOKEN)
@@ -38,36 +40,6 @@ def main_menu(chat_id):
     markup = user_action_menu()
     bot.send_message(chat_id, 'Главное меню:', reply_markup=markup)
 
-
-# Хендлер для команды /start
-@bot.message_handler(commands=['start'])
-def start(message):
-    if message.from_user.id in admins:
-        # Если пользователь админ, показываем список станций
-        stations = get_all_stations()
-        markup = types.ReplyKeyboardMarkup(one_time_keyboard=True)
-        for station in stations:
-            item = types.KeyboardButton(station)
-            markup.add(item)
-        markup.add('Главное меню')
-        bot.send_message(message.chat.id, 'Выберите станцию:', reply_markup=markup)
-    else:
-        # Если пользователь не админ, показываем список команд из базы данных
-        commands = get_all_commands()
-
-        if not commands:
-            bot.send_message(message.chat.id,
-                             'В базе данных нет доступных команд. Пожалуйста, обратитесь к администратору.')
-            return
-
-        markup = types.ReplyKeyboardMarkup(one_time_keyboard=True)
-        for command in commands:
-            item = types.KeyboardButton(command)
-            markup.add(item)
-        markup.add('Главное меню')
-        bot.send_message(message.chat.id, 'Выберите команду:', reply_markup=markup)
-        # Регистрируем следующий шаг - обработка выбора команды
-        bot.register_next_step_handler(message, process_command_selection)
 def process_command_selection(message):
     selected_command = message.text
     # Получаем список команд из базы данных
@@ -187,6 +159,8 @@ def start(message):
         bot.send_message(message.chat.id, 'Выберите команду:', reply_markup=markup)
         # Регистрируем следующий шаг - обработка выбора команды
         bot.register_next_step_handler(message, process_command_selection)
+
+
 def process_command_selection(message):
     selected_command = message.text
     # Получаем список команд из базы данных
@@ -250,18 +224,49 @@ def user_command(message):
     # После выбора команды показываем дополнительные кнопки
     bot.send_message(message.chat.id, 'Что бы вы хотели сделать?', reply_markup=user_action_menu())
 
+# Хендлер для выбора действия внутри "Баланс"
+@bot.message_handler(func=lambda message: message.text == 'Баланс')
+def balance_handler(message):
+    bot.send_message(message.chat.id, f'Вы выбрали: {message.text}')
+
+    # Получаем username пользователя
+    username = message.from_user.username
+    if not username:
+        username = f"user_{message.from_user.id}"
+
+    # Получаем информацию о пользователе
+    user_info = get_user_by_username(username)
+
+    if user_info:
+        # Получаем ID команды пользователя
+        user_id = user_info[0]
+        command_id = get_user_command_id(user_id)
+
+        if command_id:
+            # Получаем баланс команды
+            balance = get_balance(command_id)
+
+            if balance is not None:
+                # Получаем название команды
+                command_name = get_command_name_by_id(command_id)
+                bot.send_message(message.chat.id, f'Текущий баланс команды "{command_name}": {balance} монет')
+            else:
+                bot.send_message(message.chat.id, 'Не удалось получить баланс команды.')
+        else:
+            bot.send_message(message.chat.id, 'Вы не состоите в команде.')
+    else:
+        bot.send_message(message.chat.id,
+                         'Вы не зарегистрированы в системе. Пожалуйста, выберите команду в главном меню.')
+
+    # Показываем меню действий с балансом
+    bot.send_message(message.chat.id, f'Что бы вы хотели сделать с балансом?', reply_markup=balance_action_menu())
 
 
-
-# Хендлер для выбора действия внутри "Баланс" или "Акции"
-@bot.message_handler(func=lambda message: message.text in ['Баланс', 'Акции'])
-def balance_or_promotions(message):
-    selected_action = message.text
-    bot.send_message(message.chat.id, f'Вы выбрали: {selected_action}')
-
-    # Добавляем кнопку "Перевод" внутри разделов "Баланс" и "Акции"
-    bot.send_message(message.chat.id, f'Что бы вы хотели сделать с {selected_action.lower()}?', reply_markup=action_menu())
-
+# Хендлер для выбора действия внутри "Акции"
+@bot.message_handler(func=lambda message: message.text == 'Акции')
+def promotions_handler(message):
+    bot.send_message(message.chat.id, f'Вы выбрали: {message.text}')
+    bot.send_message(message.chat.id, f'Что бы вы хотели сделать с акциями?', reply_markup=action_action_menu())
 
 
 #TODO:
@@ -291,7 +296,6 @@ def admin_station(message):
 
     # Показываем кнопку "Переводы" после выбора станции
     bot.send_message(message.chat.id, 'Что бы вы хотели сделать?', reply_markup=admin_menu())
-
 
 # Хендлер для кнопки "Команда" — возвращаем пользователя в меню действий
 @bot.message_handler(func=lambda message: message.text == 'Команда')
