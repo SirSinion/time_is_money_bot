@@ -1,3 +1,4 @@
 DATABASE = 'tutorial.db'
 ACTIVS_TABLE_NAME = "blanks"
 USERS_TABLE_NAME = "users"
+TOKEN = '7900245932:AAEHABitMTniyRHo_pAxvEjE_Phk-ZBh0Q8'
