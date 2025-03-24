@@ -2,10 +2,12 @@ import sqlite3
 import telebot
 from telebot import types
 from config import TOKEN
-from db import add_user, get_all_commands, get_all_stations, get_command_id_by_name, get_user_by_username, update_user_command
+from db import add_user, get_all_commands, get_all_stations, get_command_id_by_name, get_user_by_username, \
+    update_user_command, get_command_info, format_command_info
 
+commands = get_all_commands()
 bot = telebot.TeleBot(TOKEN)
-
+stations = get_all_stations()
 # Список ID администраторов
 admins = [123456789, 987654321]
 
@@ -117,10 +119,6 @@ def process_command_selection(message):
         # Снова отправляем клавиатуру с командами
         start(message)
 
-# Список ID администраторов
-admins = [123456789, 987654321]
-
-# Список ID администраторов
 def user_action_menu():
     markup = types.ReplyKeyboardMarkup(one_time_keyboard=True)
     markup.add('Команда', 'Баланс', 'Акции')
@@ -147,7 +145,6 @@ def get_all_commands() -> list:
     """
     conn = sqlite3.connect('game.db')
     cursor = conn.cursor()
-
     try:
         cursor.execute("SELECT name_command FROM commands")
         commands = [row[0] for row in cursor.fetchall()]
@@ -159,22 +156,6 @@ def get_all_commands() -> list:
 
     finally:
         conn.close()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 # Хендлер для команды /start
@@ -206,64 +187,55 @@ def start(message):
         bot.send_message(message.chat.id, 'Выберите команду:', reply_markup=markup)
         # Регистрируем следующий шаг - обработка выбора команды
         bot.register_next_step_handler(message, process_command_selection)
-
-
 def process_command_selection(message):
     selected_command = message.text
+    # Получаем список команд из базы данных
     commands = get_all_commands()
+
     # Проверяем, что выбор не "Главное меню"
     if selected_command == 'Главное меню':
         # Возвращаемся в главное меню
-        action_menu(message)  # Предполагается, что у вас есть функция для главного меню
+        main_menu(message.chat.id)
         return
 
     # Проверяем, что выбранная команда существует в списке команд
     if selected_command in commands:
-        # Получаем ID команды из базы данных
-        conn = sqlite3.connect('game.db')
-        cursor = conn.cursor()
-
         try:
             # Находим ID команды по её названию
-            cursor.execute("SELECT command_id FROM commands WHERE command_name = ?", (selected_command,))
-            result = cursor.fetchone()
+            command_id = get_command_id_by_name(selected_command)
 
-            if result:
-                command_id = result[0]
-
+            if command_id:
                 # Получаем имя пользователя (или используем username из Telegram)
                 username = message.from_user.username
                 if not username:
                     username = f"user_{message.from_user.id}"
 
                 # Проверяем, существует ли пользователь уже в базе
-                cursor.execute("SELECT user_id FROM users WHERE username = ?", (username,))
-                user_result = cursor.fetchone()
+                user_info = get_user_by_username(username)
 
-                if user_result:
+                if user_info:
                     # Пользователь существует, обновляем его команду
-                    user_id = user_result[0]
-                    cursor.execute("UPDATE users SET command_id = ? WHERE user_id = ?", (command_id, user_id))
-                    conn.commit()
+                    user_id = user_info[0]
+                    update_user_command(user_id, command_id)
                     bot.send_message(message.chat.id, f"Вы успешно присоединились к команде '{selected_command}'!")
                 else:
                     # Пользователь не существует, добавляем нового
                     user_id = add_user(username, command_id)
                     bot.send_message(message.chat.id,
                                      f"Вы успешно зарегистрированы и присоединились к команде '{selected_command}'!")
+
+                # После регистрации показываем главное меню
+                main_menu(message.chat.id)
             else:
                 bot.send_message(message.chat.id, "Выбранная команда не найдена в базе данных.")
 
         except Exception as e:
             bot.send_message(message.chat.id, f"Произошла ошибка при выборе команды: {str(e)}")
 
-        finally:
-            conn.close()
     else:
         bot.send_message(message.chat.id, "Пожалуйста, выберите команду из предложенных вариантов.")
         # Снова отправляем клавиатуру с командами
         start(message)
-
 
 def start_message(message):
     conn = sqlite3.connect('game.db')
@@ -280,6 +252,7 @@ def user_command(message):
 
 
 
+
 # Хендлер для выбора действия внутри "Баланс" или "Акции"
 @bot.message_handler(func=lambda message: message.text in ['Баланс', 'Акции'])
 def balance_or_promotions(message):
@@ -289,13 +262,20 @@ def balance_or_promotions(message):
     # Добавляем кнопку "Перевод" внутри разделов "Баланс" и "Акции"
     bot.send_message(message.chat.id, f'Что бы вы хотели сделать с {selected_action.lower()}?', reply_markup=action_menu())
 
+
+
+#TODO:
 # Хендлер для действия "Перевод" (для пользователей)
+
+# Хендлер для действия "Перевод"
 @bot.message_handler(func=lambda message: message.text == 'Перевод')
 def transfer(message):
+    bot.send_message(message.chat.id,
+                     'Введите команду, размер перевода и процент при бафах/дебафов (_Команду_ _Размер_ _процент(опционально)_)')
+    bot.register_next_step_handler(message, money_transfer)
 
-
-
-    bot.send_message(message.chat.id, 'Перевод выполнен!')
+def money_transfer(message):
+    bot.send_message(message.chat.id, f'Перевод выполнен!', reply_markup=user_action_menu())
 
 
 # Хендлер для действия "Переводы" (для администраторов)
@@ -315,10 +295,23 @@ def admin_station(message):
 
 # Хендлер для кнопки "Команда" — возвращаем пользователя в меню действий
 @bot.message_handler(func=lambda message: message.text == 'Команда')
-def back_to_user_action_menu(message):
+def show_team_info(message):
+    user_data = get_user_by_username(message.from_user.username)
 
-    bot.send_message(message.chat.id, 'Что бы вы хотели сделать?', reply_markup=user_action_menu())
+    if not user_data:
+        bot.send_message(message.chat.id, "Вы не зарегистрированы в системе.")
+        return
 
+    user_id, command_id = user_data
+
+    if not command_id:
+        bot.send_message(message.chat.id, "Вы не состоите в команде.")
+        return
+
+    command_info = get_command_info(command_id)
+    formatted_info = format_command_info(command_info)
+
+    bot.send_message(message.chat.id, formatted_info, reply_markup=user_action_menu())
 # Хендлер для "Главного меню"
 @bot.message_handler(func=lambda message: message.text == 'Главное меню')
 def back_to_main_menu(message):

@@ -260,6 +260,108 @@ def get_user_by_username(username: str) -> Optional[Tuple[int, int]]:
         conn.close()
 
 
+def get_command_info(command_id: int) -> Optional[dict]:
+    """
+    Получает информацию о команде по её ID.
+
+    Args:
+        command_id: ID команды
+
+    Returns:
+        Словарь с информацией о команде или None, если команда не найдена
+    """
+    conn = sqlite3.connect('game.db')
+    cursor = conn.cursor()
+
+    try:
+        # Получаем основную информацию о команде
+        cursor.execute("SELECT command_id, name_command, balance FROM commands WHERE command_id = ?", (command_id,))
+        command_data = cursor.fetchone()
+
+        if not command_data:
+            return None
+
+        # Получаем список участников команды
+        cursor.execute("SELECT user_id, username FROM users WHERE command_id = ?", (command_id,))
+        members = cursor.fetchall()
+
+        # Формируем результат
+        result = {
+            'command_id': command_data[0],
+            'name': command_data[1],
+            'balance': command_data[2],
+            'members': [{'user_id': user[0], 'username': user[1]} for user in members],
+            'member_count': len(members)
+        }
+
+        return result
+
+    except sqlite3.Error as e:
+        print(f"Ошибка при получении информации о команде: {e}")
+        return None
+
+    finally:
+        conn.close()
+
+
+def get_user_command_info(user_id: int) -> Optional[dict]:
+    """
+    Получает информацию о команде пользователя.
+
+    Args:
+        user_id: ID пользователя
+
+    Returns:
+        Словарь с информацией о команде или None, если пользователь не в команде
+    """
+    conn = sqlite3.connect('game.db')
+    cursor = conn.cursor()
+
+    try:
+        # Получаем ID команды пользователя
+        cursor.execute("SELECT command_id FROM users WHERE user_id = ?", (user_id,))
+        result = cursor.fetchone()
+
+        if not result or result[0] is None:
+            return None
+
+        command_id = result[0]
+
+        # Используем функцию get_command_info для получения информации о команде
+        return get_command_info(command_id)
+
+    except sqlite3.Error as e:
+        print(f"Ошибка при получении информации о команде пользователя: {e}")
+        return None
+
+    finally:
+        conn.close()
+
+
+def format_command_info(command_info: dict) -> str:
+    """
+    Форматирует информацию о команде в читаемый текст.
+
+    Args:
+        command_info: Словарь с информацией о команде
+
+    Returns:
+        Строка с отформатированной информацией
+    """
+    if not command_info:
+        return "Информация о команде не найдена."
+
+    members_text = "\n".join([f"- {member['username']}" for member in command_info['members']])
+
+    return (
+        f"📋 Информация о команде\n\n"
+        f"Название: {command_info['name']}\n"
+        f"Баланс: {command_info['balance']} монет\n"
+        f"Количество участников: {command_info['member_count']}\n\n"
+        f"Участники команды:\n{members_text}"
+    )
+
+
 def update_user_command(user_id: int, command_id: int) -> bool:
     """
     Обновляет команду пользователя.
