@@ -73,6 +73,8 @@ def create_database():
     # Добавим тестовую команду
     cursor.execute("INSERT INTO commands (name_command, balance) VALUES (?, ?)",
                    ("Тестовая команда", 1000))
+    cursor.execute("INSERT INTO commands (name_command, balance) VALUES (?, ?)",
+                   ("Тестовая команда 2", 1000))
 
     conn.commit()
     conn.close()
@@ -1283,6 +1285,48 @@ def transfer_balance(from_command_id: int, to_command_id: int, amount: int) -> b
             (amount, from_command_id)
         )
 
+        cursor.execute(
+            "UPDATE commands SET balance = balance + ? WHERE command_id = ?",
+            (amount, to_command_id)
+        )
+
+        close_db(conn)
+        return True
+
+    except Exception as e:
+        print(f"Ошибка при переводе средств: {e}")
+        close_db(conn, commit=False)
+        return False
+
+def admin_transfer_balance(to_command_id: int, amount: int, procient: int) -> bool:
+    """
+    Переводит деньги с баланса одной команды на баланс другой
+
+    Args:
+        to_command_id: ID команды-получателя
+        amount: Сумма перевода
+        procient: Процент изменения перевода
+
+    Returns:
+        True если операция успешна, False в противном случае
+    """
+    conn, cursor = connect_db()
+
+    try:
+        # Проверяем существование команд
+        cursor.execute("SELECT command_id FROM commands WHERE command_id = ?",
+                       ( to_command_id,))
+        commands = cursor.fetchall()
+
+        if len(commands) != 1:
+            print("Команда не найдена")
+            close_db(conn, commit=False)
+            return False
+
+        # Редактируем размер перевода всвязи с процентами
+        amount = int(amount + amount * (procient/100))
+        # Выполняем перевод
+        
         cursor.execute(
             "UPDATE commands SET balance = balance + ? WHERE command_id = ?",
             (amount, to_command_id)

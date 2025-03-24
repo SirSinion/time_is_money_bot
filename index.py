@@ -5,14 +5,15 @@ from telebot import types
 from bot import balance_action_menu, action_action_menu
 from config import TOKEN
 from db import add_user, get_all_commands, get_all_stations, get_command_id_by_name, get_user_by_username, \
-    update_user_command, get_command_info, format_command_info, get_balance, get_user_command_id, get_command_name_by_id
+    update_user_command, get_command_info, format_command_info, get_balance, get_user_command_id, get_command_name_by_id, \
+    transfer_balance, admin_transfer_balance
 
 commands = get_all_commands()
 bot = telebot.TeleBot(TOKEN)
 stations = get_all_stations()
 # Список ID администраторов
 me = 807802225
-admins = [ 987654321]
+admins = [me]
 
 
 # Функция для создания меню пользователя
@@ -40,6 +41,11 @@ def action_menu():
 def main_menu(chat_id):
     markup = user_action_menu()
     bot.send_message(chat_id, 'Главное меню:', reply_markup=markup)
+
+def balance_action_menu():
+    markup = types.ReplyKeyboardMarkup(one_time_keyboard=True)
+    markup.add('Перевод', 'Главное меню')
+    return markup
 
 def process_command_selection(message):
     selected_command = message.text
@@ -100,7 +106,7 @@ def user_action_menu():
 # Функция для создания меню администратора
 def admin_menu():
     markup = types.ReplyKeyboardMarkup(one_time_keyboard=True)
-    markup.add('Переводы', 'Главное меню')
+    markup.add('Переводы','Продать акции(только ФЭИ)', 'Главное меню')
     return markup
 
 # Функция для создания меню выбора действия (перевод и т.д.)
@@ -282,7 +288,25 @@ def transfer(message):
     bot.register_next_step_handler(message, money_transfer)
 
 def money_transfer(message):
-    bot.send_message(message.chat.id, f'Перевод выполнен!', reply_markup=user_action_menu())
+    try:
+        message_vals = message.text.split(",") 
+        if len(message_vals) != 1:
+                bot.send_message(message.chat.id, f'Возможно вы ввели команду непраивльно. Пример "Команда 1, 400"', reply_markup=user_action_menu())
+                return
+        command_to = get_command_id_by_name(message_vals[0])
+        amout = int(message_vals[1])
+        user_data = get_user_by_username(message.from_user.username)
+        user_id, command_id = user_data
+
+        transfer = transfer_balance(command_id, command_to, amout)
+        if not transfer:
+            bot.send_message(message.chat.id, f'Ошибка при переводе', reply_markup=user_action_menu())
+        else:
+            bot.send_message(message.chat.id, f'Перевод выполнен!', reply_markup=user_action_menu())
+    except Exception as e:
+        print(e)
+        bot.send_message(message.chat.id, f'Упс, что-то пошло не так', reply_markup=user_action_menu())
+    
 
 # Хендлер для действия "Переводы" (для администраторов)
 @bot.message_handler(func=lambda message: message.text == 'Переводы')
@@ -291,8 +315,24 @@ def admin_transfer(message):
     bot.register_next_step_handler(message, admin_money_transfer)
 
 def admin_money_transfer(message):
-    bot.send_message(message.chat.id, f'Перевод выполнен!', reply_markup=admin_menu())
-
+    try:
+        message_vals = message.text.split(",") 
+        command_to = get_command_id_by_name(message_vals[0])
+        if len(message_vals) not in (2,3):
+            bot.send_message(message.chat.id, f'Возможно вы ввели команду непраивльно. Пример "Команда 1, 400, 15"', reply_markup=admin_menu())
+            return
+        amout = int(message_vals[1])
+        procient = 0
+        if len(message_vals) == 3:
+            procient = int(message_vals[2])
+        transfer = admin_transfer_balance(command_to, amout, procient)
+        if not transfer:
+            bot.send_message(message.chat.id, f'Ошибка при переводе', reply_markup=admin_menu())
+        else:
+            bot.send_message(message.chat.id, f'Перевод выполнен!', reply_markup=admin_menu())
+    except Exception as e:
+        print(e)
+        bot.send_message(message.chat.id, f'Упс, что-то пошло не так', reply_markup=admin_menu())
 # Хендлер для выбора станции (для администраторов)
 @bot.message_handler(func=lambda message: message.text in stations)
 def admin_station(message):
