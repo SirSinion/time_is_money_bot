@@ -298,6 +298,7 @@ def money_transfer(message):
     try:
         message_vals = message.text.split(",") 
         if len(message_vals) != 2:
+            print(len(message_vals))
             bot.send_message(message.chat.id, f'Возможно вы ввели команду непраивльно. Пример "Команда 1, 400"', reply_markup=user_action_menu())
             return
         command_to = get_command_id_by_name(message_vals[0])
@@ -317,8 +318,8 @@ def money_transfer(message):
 @bot.message_handler(func=lambda message: message.text == 'Перевод_акций')
 def transfer(message):
     bot.send_message(message.chat.id, 'Введите: Имя пользователя, название станции, количество акций для перевода')
-    bot.register_next_step_handler(message, money_transfer)
-def money_transfer(message):
+    bot.register_next_step_handler(message, action_transfer)
+def action_transfer(message):
     try:
         
         message_vals = message.text.split(",") 
