@@ -7,14 +7,14 @@ from config import TOKEN
 from db import add_user, get_all_commands, get_all_stations, get_command_id_by_name, get_user_by_username, \
     update_user_command, get_command_info, format_command_info, get_balance, get_user_command_id, get_command_name_by_id, \
     transfer_balance, admin_transfer_balance, buy_stocks, get_station_by_stationcode, get_all_stationscode,\
-    get_available_stocks, sell_stocks
+    get_available_stocks, sell_stocks, get_user_stocks
 
 commands = get_all_commands()
 bot = telebot.TeleBot(TOKEN)
 stations = get_all_stations()
 # Список ID администраторов
 me = 807802225
-admins = [me]
+admins = []
 
 
 # Функция для создания меню пользователя
@@ -271,7 +271,15 @@ def balance_handler(message):
 @bot.message_handler(func=lambda message: message.text == 'Акции')
 def balance_or_promotions(message):
     bot.send_message(message.chat.id, f'Вы выбрали: {message.text}')
-    bot.send_message(message.chat.id, f'Что бы вы хотели сделать с {message.text.lower()}?', reply_markup=action_action_menu())
+    user_id, command_id = get_user_by_username(message.from_user.username)
+    res = get_user_stocks(user_id)
+    message_text = ''
+    for i in res:
+        message_text += f'{i['code']}: {i['amount']}\n'
+    if res ==[]:
+        bot.send_message(message.chat.id, f'На вашем щету нет акций', reply_markup=action_action_menu())
+    else:
+        bot.send_message(message.chat.id, f'Ваши акции:\n{message_text}', reply_markup=action_action_menu())
  
 
 #TODO:

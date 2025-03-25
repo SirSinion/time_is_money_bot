@@ -140,6 +140,27 @@ def get_all_stations() -> list:
     finally:
         conn.close()
 
+def get_all_stationscode() -> list:
+    """
+    Получает список всех кодов из базы данных.
+
+    Returns:
+        Список кодов станций
+    """
+    conn = sqlite3.connect('game.db')
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("SELECT code FROM stations")
+        stations = [row[0] for row in cursor.fetchall()]
+        return stations
+
+    except sqlite3.Error as e:
+        print(f"Ошибка при получении списка станций: {e}")
+        return []
+
+    finally:
+        conn.close()
 
 # Добавление команды
 def add_command(name_command: str, initial_balance: int = 0) -> int:
@@ -280,7 +301,7 @@ def get_station_by_stationcode(stationcode: str) -> Optional[int]:
         return result if result else None
 
     except sqlite3.Error as e:
-        print(f"Ошибка при получении информации о пользователе: {e}")
+        print(f"Ошибка при получении информации о станции: {e}")
         return None
 
     finally:
