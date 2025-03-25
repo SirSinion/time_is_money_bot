@@ -261,6 +261,31 @@ def get_user_by_username(username: str) -> Optional[Tuple[int, int]]:
     finally:
         conn.close()
 
+def get_station_by_stationcode(stationcode: str) -> Optional[int]:
+    """
+    Получает информацию о пользователе по его имени.
+
+    Args:
+        stationcode: Имя Института
+
+    Returns:
+        station_id или None, если пользователь не найден
+    """
+    conn = sqlite3.connect('game.db')
+    cursor = conn.cursor()
+
+    try:
+        cursor.execute("SELECT station_id FROM stations WHERE code = ?", (stationcode,))
+        result = cursor.fetchone()[0]
+        return result if result else None
+
+    except sqlite3.Error as e:
+        print(f"Ошибка при получении информации о пользователе: {e}")
+        return None
+
+    finally:
+        conn.close()
+
 
 def get_command_info(command_id: int) -> Optional[dict]:
     """

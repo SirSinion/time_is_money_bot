@@ -6,7 +6,7 @@ from bot import balance_action_menu, action_action_menu
 from config import TOKEN
 from db import add_user, get_all_commands, get_all_stations, get_command_id_by_name, get_user_by_username, \
     update_user_command, get_command_info, format_command_info, get_balance, get_user_command_id, get_command_name_by_id, \
-    transfer_balance, admin_transfer_balance
+    transfer_balance, admin_transfer_balance, buy_stocks, get_station_by_stationcode, sell_stocks
 
 commands = get_all_commands()
 bot = telebot.TeleBot(TOKEN)
@@ -106,7 +106,7 @@ def user_action_menu():
 # Функция для создания меню администратора
 def admin_menu():
     markup = types.ReplyKeyboardMarkup(one_time_keyboard=True)
-    markup.add('Переводы','Продать акции(только ФЭИ)', 'Главное меню')
+    markup.add('Переводы','Купить акции(только ФЭИ)','Продать акции(только ФЭИ)', 'Главное меню')
     return markup
 
 # Функция для создания меню выбора действия (перевод и т.д.)
@@ -266,12 +266,7 @@ def balance_handler(message):
     # Показываем меню действий с балансом
     bot.send_message(message.chat.id, f'Что бы вы хотели сделать с балансом?', reply_markup=balance_action_menu())
 
-# Хендлер для выбора действия внутри "Баланс" или "Акции"
-@bot.message_handler(func=lambda message: message.text == 'Баланс')
-def balance_or_promotions(message):
-    bot.send_message(message.chat.id, f'Вы выбрали: {message.text}')
-    bot.send_message(message.chat.id, f'Что бы вы хотели сделать с {message.text.lower()}?', reply_markup=balance_action_menu())
-
+# Хендлер для выбора действия внутри "Акции"
 @bot.message_handler(func=lambda message: message.text == 'Акции')
 def balance_or_promotions(message):
     bot.send_message(message.chat.id, f'Вы выбрали: {message.text}')
@@ -286,7 +281,6 @@ def balance_or_promotions(message):
 def transfer(message):
     bot.send_message(message.chat.id, 'Введите команду, размер перевода')
     bot.register_next_step_handler(message, money_transfer)
-
 def money_transfer(message):
     try:
         message_vals = message.text.split(",") 
@@ -313,7 +307,6 @@ def money_transfer(message):
 def admin_transfer(message):
     bot.send_message(message.chat.id, 'Введите команду, размер перевода и процент при бафах/дебафов (_Команду_ _Размер_ _процент(опционально)_)')
     bot.register_next_step_handler(message, admin_money_transfer)
-
 def admin_money_transfer(message):
     try:
         message_vals = message.text.split(",") 
@@ -333,6 +326,48 @@ def admin_money_transfer(message):
     except Exception as e:
         print(e)
         bot.send_message(message.chat.id, f'Упс, что-то пошло не так', reply_markup=admin_menu())
+
+@bot.message_handler(func=lambda message: message.text == 'Купить акции(только ФЭИ)')
+def transfer(message):
+    bot.send_message(message.chat.id, 'Введите: Имя пользователя, станцию для покупки, количество акций(покупает пользователь) ')
+    bot.register_next_step_handler(message, admin_action_buyng)
+def admin_action_buyng(message):
+    message_vals = message.text.split(",")
+    if len(message_vals) != 3:
+        bot.send_message(message.chat.id, f'Возможно вы ввели команду непраивльно. Пример "Sir_Sinion, Матфак, 10"', reply_markup=admin_menu())
+        return
+    
+    user_id, command_id = get_user_by_username(message_vals[0])
+    station_id = get_station_by_stationcode(message_vals[1].strip())
+    amount = int(message_vals[2])
+    res = buy_stocks(user_id, station_id, amount)
+
+    if res:
+        bot.send_message(message.chat.id, f"Акци куплены пользовавтелем", reply_markup=admin_menu())
+    else:
+        bot.send_message(message.chat.id, f'Ошибка при транзакции', reply_markup=admin_menu())
+
+@bot.message_handler(func=lambda message: message.text == 'Продать акции(только ФЭИ)')
+def transfer(message):
+    bot.send_message(message.chat.id, 'Введите: Имя пользователя, станцию для покупки, количество акций(покупает пользователь) ')
+    bot.register_next_step_handler(message, admin_action_selling)
+def admin_action_selling(message):
+    message_vals = message.text.split(",")
+    if len(message_vals) != 3:
+        bot.send_message(message.chat.id, f'Возможно вы ввели команду непраивльно. Пример "Sir_Sinion, Матфак, 10"', reply_markup=admin_menu())
+        return
+    
+    
+    user_id, command_id = get_user_by_username(message_vals[0])
+    station_id = get_station_by_stationcode(message_vals[1].strip())
+    amount = int(message_vals[2])
+    res = buy_stocks(user_id, station_id, amount)
+
+    if res:
+        bot.send_message(message.chat.id, f"Акци куплены пользовавтелем", reply_markup=admin_menu())
+    else:
+        bot.send_message(message.chat.id, f'Ошибка при транзакции', reply_markup=admin_menu())
+
 # Хендлер для выбора станции (для администраторов)
 @bot.message_handler(func=lambda message: message.text in stations)
 def admin_station(message):
