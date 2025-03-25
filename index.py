@@ -2,12 +2,11 @@ import sqlite3
 import telebot
 from telebot import types
 
-from bot import balance_action_menu, action_action_menu
 from config import TOKEN
 from db import add_user, get_all_commands, get_all_stations, get_command_id_by_name, get_user_by_username, \
     update_user_command, get_command_info, format_command_info, get_balance, get_user_command_id, get_command_name_by_id, \
     transfer_balance, admin_transfer_balance, buy_stocks, get_station_by_stationcode, get_all_stationscode,\
-    get_available_stocks, sell_stocks, get_user_stocks
+    get_available_stocks, sell_stocks, get_user_stocks, transfer_stocks
 
 commands = get_all_commands()
 bot = telebot.TeleBot(TOKEN)
@@ -27,7 +26,7 @@ def user_action_menu():
 # Функция для создания меню администратора
 def admin_menu():
     markup = types.ReplyKeyboardMarkup(one_time_keyboard=True)
-    markup.add('Переводы', 'Главное меню')
+    markup.add('Переводы_акций', 'Главное меню')
     return markup
 
 
@@ -46,6 +45,11 @@ def main_menu(chat_id):
 def balance_action_menu():
     markup = types.ReplyKeyboardMarkup(one_time_keyboard=True)
     markup.add('Перевод', 'Главное меню')
+    return markup
+
+def action_action_menu():
+    markup = types.ReplyKeyboardMarkup(one_time_keyboard=True)
+    markup.add('Перевод_акций', 'Главное меню')
     return markup
 
 def process_command_selection(message):
@@ -293,9 +297,9 @@ def transfer(message):
 def money_transfer(message):
     try:
         message_vals = message.text.split(",") 
-        if len(message_vals) != 1:
-                bot.send_message(message.chat.id, f'Возможно вы ввели команду непраивльно. Пример "Команда 1, 400"', reply_markup=user_action_menu())
-                return
+        if len(message_vals) != 2:
+            bot.send_message(message.chat.id, f'Возможно вы ввели команду непраивльно. Пример "Команда 1, 400"', reply_markup=user_action_menu())
+            return
         command_to = get_command_id_by_name(message_vals[0])
         amout = int(message_vals[1])
         user_data = get_user_by_username(message.from_user.username)
@@ -310,7 +314,31 @@ def money_transfer(message):
         print(e)
         bot.send_message(message.chat.id, f'Упс, что-то пошло не так', reply_markup=user_action_menu())
     
-
+@bot.message_handler(func=lambda message: message.text == 'Перевод_акций')
+def transfer(message):
+    bot.send_message(message.chat.id, 'Введите: Имя пользователя, название станции, количество акций для перевода')
+    bot.register_next_step_handler(message, money_transfer)
+def money_transfer(message):
+    try:
+        
+        message_vals = message.text.split(",") 
+        if len(message_vals) != 3:
+            bot.send_message(message.chat.id, f'Возможно вы ввели команду непраивльно. Пример "Sir_Sinion, МФ, 2"', reply_markup=user_action_menu())
+            return
+        from_user, command_id = get_user_by_username(message.from_user.username)
+        user_to, command_id = get_user_by_username(message_vals[0])
+        station = message_vals[1].strip()
+        station_id = get_station_by_stationcode(station)
+        amount = int(message_vals[2])
+        transfer = transfer_stocks(from_user, user_to, station_id, amount)
+        if not transfer:
+            bot.send_message(message.chat.id, f'Ошибка при переводе', reply_markup=user_action_menu())
+        else:
+            bot.send_message(message.chat.id, f'Перевод выполнен!', reply_markup=user_action_menu())
+    except Exception as e:
+        print(e)
+        bot.send_message(message.chat.id, f'Упс, что-то пошло не так', reply_markup=user_action_menu())
+    
 # Хендлер для действия "Переводы" (для администраторов)
 @bot.message_handler(func=lambda message: message.text == 'Переводы')
 def admin_transfer(message):
