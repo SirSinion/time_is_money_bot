@@ -6,7 +6,8 @@ from bot import balance_action_menu, action_action_menu
 from config import TOKEN
 from db import add_user, get_all_commands, get_all_stations, get_command_id_by_name, get_user_by_username, \
     update_user_command, get_command_info, format_command_info, get_balance, get_user_command_id, get_command_name_by_id, \
-    transfer_balance, admin_transfer_balance, buy_stocks, get_station_by_stationcode, sell_stocks
+    transfer_balance, admin_transfer_balance, buy_stocks, get_station_by_stationcode, get_all_stationscode,\
+    get_available_stocks
 
 commands = get_all_commands()
 bot = telebot.TeleBot(TOKEN)
@@ -329,6 +330,15 @@ def admin_money_transfer(message):
 
 @bot.message_handler(func=lambda message: message.text == 'Купить акции(только ФЭИ)')
 def transfer(message):
+    bot.send_message(message.chat.id, f'Вы выбрали: {message.text}')
+    res = get_all_stationscode()
+    message_text = 'Доступные акции:'
+    for i in res:
+        station_id = get_station_by_stationcode(i)
+        action_amount = get_available_stocks(station_id)
+        message_text += f'{i} : {action_amount} \n'
+    bot.send_message(message.chat.id, message_text)
+
     bot.send_message(message.chat.id, 'Введите: Имя пользователя, станцию для покупки, количество акций(покупает пользователь) ')
     bot.register_next_step_handler(message, admin_action_buyng)
 def admin_action_buyng(message):
@@ -348,6 +358,7 @@ def admin_action_buyng(message):
         bot.send_message(message.chat.id, f'Ошибка при транзакции', reply_markup=admin_menu())
 
 @bot.message_handler(func=lambda message: message.text == 'Продать акции(только ФЭИ)')
+
 def transfer(message):
     bot.send_message(message.chat.id, 'Введите: Имя пользователя, станцию для покупки, количество акций(покупает пользователь) ')
     bot.register_next_step_handler(message, admin_action_selling)
@@ -356,7 +367,6 @@ def admin_action_selling(message):
     if len(message_vals) != 3:
         bot.send_message(message.chat.id, f'Возможно вы ввели команду непраивльно. Пример "Sir_Sinion, Матфак, 10"', reply_markup=admin_menu())
         return
-    
     
     user_id, command_id = get_user_by_username(message_vals[0])
     station_id = get_station_by_stationcode(message_vals[1].strip())
