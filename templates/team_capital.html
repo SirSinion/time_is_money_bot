@@ -1,0 +1,57 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Team Capital - Stock Market</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Команды</h1>
+            <nav class="main-nav">
+                <ul>
+                    <li><a href="/">Котировки акций</a></li>
+                    <li><a href="/transactions">История переводов</a></li>
+                    <li><a href="/team-capital" class="active">Капиталы команд</a></li>
+                </ul>
+            </nav>
+        </header>
+
+        <main>
+            <div class="chart-container">
+                <canvas id="teamCapitalChart"></canvas>
+            </div>
+
+            <div class="team-table-container">
+                <table class="team-table">
+                    <thead>
+                        <tr>
+                            <th>Ранг</th>
+                            <th>Команда</th>
+                            <th>Баланс</th>
+                            <th>Баланс акций</th>
+                            <th>Общий капитал</th>
+                        </tr>
+                    </thead>
+                    <tbody id="teamTableBody">
+                        <tr>
+                            <td colspan="5" class="loading">Loading team data...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </main>
+
+        <footer>
+            <p>Сделано с любовью муффелем и сир-синьйоном</p>
+        </footer>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="{{ url_for('static', filename='team_capital.js') }}"></script>
+</body>
+</html>
+    

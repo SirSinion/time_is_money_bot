@@ -1,0 +1,54 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transaction History - Stock Market</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Транзакции</h1>
+            <nav class="main-nav">
+                <ul>
+                    <li><a href="/">Котировки акций</a></li>
+                    <li><a href="/transactions" class="active">История переводов</a></li>
+                    <li><a href="/team-capital">Капиталы команд</a></li>
+                </ul>
+            </nav>
+        </header>
+
+        <main>
+            <div class="transactions-container">
+                <table class="transactions-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>User</th>
+                            <th>Team</th>
+                            <th>Stock</th>
+                            <th>Amount</th>
+                            <th>Price</th>
+                            <th>Total</th>
+                        </tr>
+                    </thead>
+                    <tbody id="transactionsTableBody">
+                        <tr>
+                            <td colspan="7" class="loading">Loading transaction data...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </main>
+
+        <footer>
+            <p>Сделано с любовью муффелем и сир-синьйоном</p>
+        </footer>
+    </div>
+
+    <script src="{{ url_for('static', filename='transactions.js') }}"></script>
+</body>
+</html>
+    

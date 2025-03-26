@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Market Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Котировки акций</h1>
+            <nav class="main-nav">
+                <ul>
+                    <li><a href="/" class="active">Котировки акций</a></li>
+                    <li><a href="/transactions">История переводов</a></li>
+                    <li><a href="/team-capital">Капиталы команд</a></li>
+                </ul>
+            </nav>
+        </header>
+
+        <main>
+            <div class="stock-chart-container">
+                <canvas id="stockChart"></canvas>
+            </div>
+
+            <div class="stock-container" id="stockContainer">
+                <!-- Stocks will be loaded here -->
+                <div class="loading">Loading stocks data...</div>
+            </div>
+        </main>
+
+        <footer>
+            <p>Сделано с любовью муффелем и сир-синьйоном</p>
+        </footer>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
+    

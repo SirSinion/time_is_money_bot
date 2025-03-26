@@ -229,7 +229,7 @@ def balance_or_promotions(message):
     res = get_user_stocks(user_id)
     message_text = ''
     for i in res:
-        message_text += f'{i['code']}: {i['amount']}\n'
+        message_text += f"{i['code']}: {i['amount']}\n"
     if res ==[]:
         bot.send_message(message.chat.id, f'На вашем щету нет акций', reply_markup=action_action_menu())
     else:
