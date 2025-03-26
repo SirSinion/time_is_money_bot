@@ -12,8 +12,9 @@ commands = get_all_commands()
 bot = telebot.TeleBot(TOKEN)
 stations = get_all_stations()
 # Список ID администраторов
+MAIN_ADMIN = 1
 me = 807802225
-admins = [me]
+admins = []
 
 
 # Функция для создания меню пользователя
@@ -47,7 +48,6 @@ def balance_action_menu():
     markup.add('Перевод', 'Главное меню')
     return markup
 
-
 def action_action_menu():
     markup = types.ReplyKeyboardMarkup(one_time_keyboard=True)
     markup.add('Перевод_акций', 'Главное меню')
@@ -61,7 +61,12 @@ def user_action_menu():
 # Функция для создания меню администратора
 def admin_menu():
     markup = types.ReplyKeyboardMarkup(one_time_keyboard=True)
-    markup.add('Переводы','Купить акции(только ФЭИ)','Продать акции(только ФЭИ)', 'Главное меню')
+    markup.add('Переводы', 'Главное меню')
+    return markup
+
+def fei_menu():
+    markup = types.ReplyKeyboardMarkup(one_time_keyboard=True)
+    markup.add('Купить акции','Продать акции', 'Главное меню')
     return markup
 
 # Функция для создания меню выбора действия (перевод и т.д.)
@@ -335,8 +340,10 @@ def admin_money_transfer(message, command):
         print(e)
         bot.send_message(message.chat.id, f'Упс, что-то пошло не так', reply_markup=admin_menu())
 
-@bot.message_handler(func=lambda message: message.text == 'Купить акции(только ФЭИ)')
-def transfer(message):
+@bot.message_handler(func=lambda message: message.text == 'Купить акции')
+def transfer(message):  
+    if message.chat.id not in admins:
+        main_menu(message.chat.id)
     bot.send_message(message.chat.id, f'Вы выбрали: {message.text}')
     res = get_all_stationscode()
     message_text = 'Доступные акции:'
@@ -364,7 +371,7 @@ def admin_action_buyng(message):
     else:
         bot.send_message(message.chat.id, f'Ошибка при транзакции', reply_markup=admin_menu())
 
-@bot.message_handler(func=lambda message: message.text == 'Продать акции(только ФЭИ)')
+@bot.message_handler(func=lambda message: message.text == 'Продать акции')
 def transfer(message):
     res = get_all_stationscode()
     message_text = 'Доступные акции:'
@@ -378,7 +385,7 @@ def transfer(message):
 def admin_action_selling(message):
     message_vals = message.text.split(",")
     if len(message_vals) != 3:
-        bot.send_message(message.chat.id, f'Возможно вы ввели команду непраивльно. Пример "Sir_Sinion, Матфак, 10"', reply_markup=admin_menu())
+        bot.send_message(message.chat.id, f'Возможно вы ввели команду непраивльно. Пример "Sir_Sinion, Матфак, 10"', reply_markup=fei_menu())
         return
     
     user_id, command_id = get_user_by_username(message_vals[0])
@@ -388,16 +395,18 @@ def admin_action_selling(message):
     res = sell_stocks(user_id, station_id, amount)
 
     if res:
-        bot.send_message(message.chat.id, f"Акци проданы пользовавтелем", reply_markup=admin_menu())
+        bot.send_message(message.chat.id, f"Акци проданы пользовавтелем", reply_markup=fei_menu())
     else:
-        bot.send_message(message.chat.id, f'Ошибка при транзакции', reply_markup=admin_menu())
+        bot.send_message(message.chat.id, f'Ошибка при транзакции', reply_markup=fei_menu())
 
 # Хендлер для выбора станции (для администраторов)
 @bot.message_handler(func=lambda message: message.text in stations)
 def admin_station(message):
     selected_station = message.text
     bot.send_message(message.chat.id, f'Вы выбрали станцию: {selected_station}')
-
+    if selected_station == 'Биржа':
+        bot.send_message(message.chat.id, 'Теперь вы админ биржи?', reply_markup=fei_menu())
+        return
     # Показываем кнопку "Переводы" после выбора станции
     bot.send_message(message.chat.id, 'Что бы вы хотели сделать?', reply_markup=admin_menu())
 
@@ -434,6 +443,7 @@ def back_to_main_menu(message):
     else:
         # Для обычного пользователя показываем меню после выбора команды
         bot.send_message(message.chat.id, 'Что бы вы хотели сделать?', reply_markup=user_action_menu())
+
 
 if __name__ == '__main__':
     bot.polling(none_stop=True)
