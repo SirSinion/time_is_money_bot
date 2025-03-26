@@ -29,7 +29,8 @@ function displayStocks(stocks) {
         return;
     }
 
-    stocks.sort((a, b) => b.price - a.price);
+    // Удалена строка с сортировкой: stocks.sort((a, b) => b.price - a.price);
+
     stocks.forEach(stock => {
         const stockCard = document.createElement('div');
         stockCard.className = 'stock-card';
@@ -43,8 +44,9 @@ function displayStocks(stocks) {
         container.appendChild(stockCard);
     });
 }
+
 function updateStockChart(stocks) {
-    const sortedStocks = [...stocks].sort((a, b) => a.price - b.price);
+    const sortedStocks = stocks /*[...stocks].sort((a, b) => a.price - b.price);*/
 
     const ctx = document.getElementById('stockChart').getContext('2d');
 

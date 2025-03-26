@@ -57,14 +57,14 @@ def create_database():
 
     # Заполнение таблицы станций начальными данными
     stations = [
-        (1, "Биржа", "ФЭИ", "Здесь можно торговать акциями и получать прибыль", 100),
-        (2, "Казино", "МФ", "Игры с расчетом шансов и вероятностей", 100),
-        (3, "Интеллектуальная станция", "СоцГум", "Вопросы по истории, философии, литературе", 100),
-        (4, "Черный рынок", "ИГиП", "Юридические сделки и 'серые схемы'", 100),
-        (5, "Физическая станция", "ИФК", "Работа, физические задания", 100),
-        (6, "Аукцион с бафами", "ШЭН", "Временные бонусы для получения выгоды", 100),
-        (7, "Стартап-инкубатор", "SAS", "Разработка идей, решение микрокейсов", 100),
-        (8, "Музыкальная станция", "ИПиП", "Музыкальные задания", 100)
+        (1, "Биржа", "ФЭИ", "Здесь можно торговать акциями и получать прибыль", 40),
+        (2, "Казино", "МФ", "Игры с расчетом шансов и вероятностей", 50),
+        (3, "Интеллектуальная станция", "СоцГум", "Вопросы по истории, философии, литературе", 40),
+        (4, "Черный рынок", "ИГиП", "Юридические сделки и 'серые схемы'", 44),
+        (5, "Физическая станция", "ИФК", "Работа, физические задания", 30),
+        (6, "Аукцион с бафами", "ШЭН", "Временные бонусы для получения выгоды", 46),
+        (7, "Стартап-инкубатор", "SAS", "Разработка идей, решение микрокейсов", 42),
+        (8, "Музыкальная станция", "ИПиП", "Музыкальные задания", 35)
     ]
 
     cursor.executemany("INSERT OR IGNORE INTO stations VALUES (?, ?, ?, ?, ?)", stations)
@@ -1343,14 +1343,16 @@ def transfer_balance(from_command_id: int, to_command_id: int, amount: int) -> b
         close_db(conn, commit=False)
         return False
 
-def admin_transfer_balance(to_command_id: int, amount: int, procient: int) -> bool:
+
+def admin_transfer_balance(to_command_id: int, amount: int, procient: int, station_id: int = None) -> bool:
     """
-    Переводит деньги с баланса одной команды на баланс другой
+    Переводит деньги с баланса администратора на баланс команды с учетом процента и комиссии владельцу станции
 
     Args:
         to_command_id: ID команды-получателя
         amount: Сумма перевода
         procient: Процент изменения перевода
+        station_id: ID станции, на которой происходит транзакция
 
     Returns:
         True если операция успешна, False в противном случае
@@ -1358,9 +1360,9 @@ def admin_transfer_balance(to_command_id: int, amount: int, procient: int) -> bo
     conn, cursor = connect_db()
 
     try:
-        # Проверяем существование команд
+        # Проверяем существование команды
         cursor.execute("SELECT command_id FROM commands WHERE command_id = ?",
-                       ( to_command_id,))
+                       (to_command_id,))
         commands = cursor.fetchall()
 
         if len(commands) != 1:
@@ -1368,14 +1370,69 @@ def admin_transfer_balance(to_command_id: int, amount: int, procient: int) -> bo
             close_db(conn, commit=False)
             return False
 
-        # Редактируем размер перевода всвязи с процентами
-        amount = int(amount + amount * (procient/100))
+        # Редактируем размер перевода в связи с процентами
+        adjusted_amount = int(amount + amount * (procient / 100))
+
+        # Если не указана станция, комиссия не взимается
+        if not station_id:
+            # Выполняем перевод без комиссии
+            cursor.execute(
+                "UPDATE commands SET balance = balance + ? WHERE command_id = ?",
+                (adjusted_amount, to_command_id)
+            )
+            close_db(conn)
+            return True
+
+        # Проверяем, есть ли команда, владеющая 51% акций этой станции
+        cursor.execute("""
+            SELECT u.command_id, SUM(us.amount) as total_stocks
+            FROM user_stocks us
+            JOIN users u ON us.user_id = u.user_id
+            WHERE us.station_id = ?
+            GROUP BY u.command_id
+        """, (station_id,))
+
+        command_stocks = cursor.fetchall()
+
+        # Получаем общее количество акций станции
+        cursor.execute("SELECT total_stocks FROM stations WHERE station_id = ?", (station_id,))
+        station_result = cursor.fetchone()
+
+        if not station_result:
+            print(f"Станция с ID {station_id} не найдена")
+            close_db(conn, commit=False)
+            return False
+
+        total_station_stocks = station_result[0]
+
+        # Ищем команду, владеющую 51% акций
+        owner_command_id = None
+        for cmd_id, stocks in command_stocks:
+            if stocks >= total_station_stocks * 0.51:
+                owner_command_id = cmd_id
+                break
+
+        # Если есть владелец и это не получатель
+        commission = 0
+        if owner_command_id and owner_command_id != to_command_id:
+            commission = int(adjusted_amount * 0.1)  # 10% комиссия
+            final_amount = adjusted_amount - commission
+        else:
+            final_amount = adjusted_amount
+
         # Выполняем перевод
-        
         cursor.execute(
             "UPDATE commands SET balance = balance + ? WHERE command_id = ?",
-            (amount, to_command_id)
+            (final_amount, to_command_id)
         )
+
+        # Если есть комиссия, переводим ее владельцу станции
+        if commission > 0:
+            cursor.execute(
+                "UPDATE commands SET balance = balance + ? WHERE command_id = ?",
+                (commission, owner_command_id)
+            )
+            print(f"Начислена комиссия {commission} команде {owner_command_id} как владельцу станции {station_id}")
 
         close_db(conn)
         return True

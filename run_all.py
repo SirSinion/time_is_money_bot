@@ -1,11 +1,14 @@
 import threading
+
+from db import create_database
 from web_server import app
 
 def run_bot():
     print("Запуск Telegram бота...")
     try:
         from index import bot
-        bot.infinity_polling()
+        create_database()
+
         pass
     except Exception as e:
         print(f"Ошибка при запуске бота: {e}")

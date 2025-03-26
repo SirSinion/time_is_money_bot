@@ -313,8 +313,9 @@ def admin_transfer(message):
         item = types.KeyboardButton(command)
         markup.add(item)
     markup.add('Главное меню')
-    bot.send_message(message.chat.id, 'Выберете команду для перевода валюты', reply_markup = markup)
+    bot.send_message(message.chat.id, 'Выберете команду для перевода валюты', reply_markup=markup)
     bot.register_next_step_handler(message, admin_money_transfer_value)
+
 def admin_money_transfer_value(message):
     command = message.text
     if command not in commands: 
@@ -323,15 +324,27 @@ def admin_money_transfer_value(message):
         return
     bot.send_message(message.chat.id, 'Введите сумму перевода и процент(если есть) через запятую')
     bot.register_next_step_handler(message, admin_money_transfer, command=command)
+
+
 def admin_money_transfer(message, command):
     try:
-        message_vals = message.text.split(",") 
+        message_vals = message.text.split(",")
         command_to = get_command_id_by_name(command)
-        amout = int(message_vals[0])
+        amount = int(message_vals[0])
         procient = 0
         if len(message_vals) == 2:
             procient = int(message_vals[1])
-        transfer = admin_transfer_balance(command_to, amout, procient)
+
+        # Получаем станцию, выбранную администратором
+        station_name = admin_stations.get(message.from_user.id)
+        station_id = None
+
+        if station_name:
+            station_id = get_station_by_stationcode(station_name)
+
+        # Модифицируем функцию admin_transfer_balance, чтобы она принимала station_id
+        transfer = admin_transfer_balance(command_to, amount, procient, station_id)
+
         if not transfer:
             bot.send_message(message.chat.id, f'Ошибка при переводе', reply_markup=admin_menu())
         else:
@@ -339,6 +352,7 @@ def admin_money_transfer(message, command):
     except Exception as e:
         print(e)
         bot.send_message(message.chat.id, f'Упс, что-то пошло не так', reply_markup=admin_menu())
+
 
 @bot.message_handler(func=lambda message: message.text == 'Купить акции')
 def transfer(message):  
@@ -399,16 +413,24 @@ def admin_action_selling(message):
     else:
         bot.send_message(message.chat.id, f'Ошибка при транзакции', reply_markup=fei_menu())
 
-# Хендлер для выбора станции (для администраторов)
+
+# Словарь для хранения текущей станции администратора
+admin_stations = {}  # {admin_id: station_name}
 @bot.message_handler(func=lambda message: message.text in stations)
 def admin_station(message):
     selected_station = message.text
     bot.send_message(message.chat.id, f'Вы выбрали станцию: {selected_station}')
+
+    # Сохраняем выбранную станцию для этого администратора
+    admin_stations[message.from_user.id] = selected_station
+
     if selected_station == 'Биржа':
         bot.send_message(message.chat.id, 'Теперь вы админ биржи?', reply_markup=fei_menu())
         return
+
     # Показываем кнопку "Переводы" после выбора станции
     bot.send_message(message.chat.id, 'Что бы вы хотели сделать?', reply_markup=admin_menu())
+
 
 # Хендлер для кнопки "Команда" — возвращаем пользователя в меню действий
 @bot.message_handler(func=lambda message: message.text == 'Команда')
