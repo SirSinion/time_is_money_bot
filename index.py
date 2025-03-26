@@ -13,7 +13,7 @@ bot = telebot.TeleBot(TOKEN)
 stations = get_all_stations()
 # Список ID администраторов
 me = 807802225
-admins = []
+admins = [me]
 
 
 # Функция для создания меню пользователя
@@ -47,61 +47,11 @@ def balance_action_menu():
     markup.add('Перевод', 'Главное меню')
     return markup
 
+
 def action_action_menu():
     markup = types.ReplyKeyboardMarkup(one_time_keyboard=True)
     markup.add('Перевод_акций', 'Главное меню')
     return markup
-
-def process_command_selection(message):
-    selected_command = message.text
-    # Получаем список команд из базы данных
-
-    commands = get_all_commands()
-
-    # Проверяем, что выбор не "Главное меню"
-    if selected_command == 'Главное меню':
-        # Возвращаемся в главное меню
-        main_menu(message.chat.id)
-        return
-
-    # Проверяем, что выбранная команда существует в списке команд
-    if selected_command in commands:
-        try:
-            # Находим ID команды по её названию
-            command_id = get_command_id_by_name(selected_command)
-
-            if command_id:
-                # Получаем имя пользователя (или используем username из Telegram)
-                username = message.from_user.username
-                if not username:
-                    username = f"user_{message.from_user.id}"
-
-                # Проверяем, существует ли пользователь уже в базе
-                user_info = get_user_by_username(username)
-
-                if user_info:
-                    # Пользователь существует, обновляем его команду
-                    user_id = user_info[0]
-                    update_user_command(user_id, command_id)
-                    bot.send_message(message.chat.id, f"Вы успешно присоединились к команде '{selected_command}'!")
-                else:
-                    # Пользователь не существует, добавляем нового
-                    user_id = add_user(username, command_id)
-                    bot.send_message(message.chat.id,
-                                     f"Вы успешно зарегистрированы и присоединились к команде '{selected_command}'!")
-
-                # После регистрации показываем главное меню
-                main_menu(message.chat.id)
-            else:
-                bot.send_message(message.chat.id, "Выбранная команда не найдена в базе данных.")
-
-        except Exception as e:
-            bot.send_message(message.chat.id, f"Произошла ошибка при выборе команды: {str(e)}")
-
-    else:
-        bot.send_message(message.chat.id, "Пожалуйста, выберите команду из предложенных вариантов.")
-        # Снова отправляем клавиатуру с командами
-        start(message)
 
 def user_action_menu():
     markup = types.ReplyKeyboardMarkup(one_time_keyboard=True)
@@ -292,17 +242,26 @@ def balance_or_promotions(message):
 # Хендлер для действия "Перевод"
 @bot.message_handler(func=lambda message: message.text == 'Перевод')
 def transfer(message):
-    bot.send_message(message.chat.id, 'Введите команду, размер перевода')
-    bot.register_next_step_handler(message, money_transfer)
-def money_transfer(message):
+    commands = get_all_commands()
+    markup = types.ReplyKeyboardMarkup(one_time_keyboard=True)
+    for command in commands:
+        item = types.KeyboardButton(command)
+        markup.add(item)
+    markup.add('Главное меню')
+    bot.send_message(message.chat.id, 'Выберете команду для перевода валюты', reply_markup = markup)
+    bot.register_next_step_handler(message, money_transfer_value)
+def money_transfer_value(message):
+    command = message.text
+    if command not in commands: 
+        bot.send_message(message.chat.id, 'К сожалению такой команды несуществует')
+        main_menu(message.chat.id)
+        return
+    bot.send_message(message.chat.id, 'Введите сумму перевода:')
+    bot.register_next_step_handler(message, money_transfer, command = command)
+def money_transfer(message, command):
     try:
-        message_vals = message.text.split(",") 
-        if len(message_vals) != 2:
-            print(len(message_vals))
-            bot.send_message(message.chat.id, f'Возможно вы ввели команду непраивльно. Пример "Команда 1, 400"', reply_markup=user_action_menu())
-            return
-        command_to = get_command_id_by_name(message_vals[0])
-        amout = int(message_vals[1])
+        command_to = get_command_id_by_name(command)
+        amout = int(message.text)
         user_data = get_user_by_username(message.from_user.username)
         user_id, command_id = user_data
 
@@ -343,19 +302,30 @@ def action_transfer(message):
 # Хендлер для действия "Переводы" (для администраторов)
 @bot.message_handler(func=lambda message: message.text == 'Переводы')
 def admin_transfer(message):
-    bot.send_message(message.chat.id, 'Введите команду, размер перевода и процент при бафах/дебафов (_Команду_ _Размер_ _процент(опционально)_)')
-    bot.register_next_step_handler(message, admin_money_transfer)
-def admin_money_transfer(message):
+    commands = get_all_commands()
+    markup = types.ReplyKeyboardMarkup(one_time_keyboard=True)
+    for command in commands:
+        item = types.KeyboardButton(command)
+        markup.add(item)
+    markup.add('Главное меню')
+    bot.send_message(message.chat.id, 'Выберете команду для перевода валюты', reply_markup = markup)
+    bot.register_next_step_handler(message, admin_money_transfer_value)
+def admin_money_transfer_value(message):
+    command = message.text
+    if command not in commands: 
+        bot.send_message(message.chat.id, 'К сожалению такой команды несуществует')
+        main_menu(message.chat.id)
+        return
+    bot.send_message(message.chat.id, 'Введите сумму перевода и процент(если есть) через запятую')
+    bot.register_next_step_handler(message, admin_money_transfer, command=command)
+def admin_money_transfer(message, command):
     try:
         message_vals = message.text.split(",") 
-        command_to = get_command_id_by_name(message_vals[0])
-        if len(message_vals) not in (2,3):
-            bot.send_message(message.chat.id, f'Возможно вы ввели команду непраивльно. Пример "Команда 1, 400, 15"', reply_markup=admin_menu())
-            return
-        amout = int(message_vals[1])
+        command_to = get_command_id_by_name(command)
+        amout = int(message_vals[0])
         procient = 0
-        if len(message_vals) == 3:
-            procient = int(message_vals[2])
+        if len(message_vals) == 2:
+            procient = int(message_vals[1])
         transfer = admin_transfer_balance(command_to, amout, procient)
         if not transfer:
             bot.send_message(message.chat.id, f'Ошибка при переводе', reply_markup=admin_menu())
