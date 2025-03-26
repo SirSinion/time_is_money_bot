@@ -8,7 +8,7 @@ def run_bot():
     try:
         from index import bot
         create_database()
-
+        bot.infinity_polling()
         pass
     except Exception as e:
         print(f"Ошибка при запуске бота: {e}")
