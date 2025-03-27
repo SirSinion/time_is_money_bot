@@ -14,7 +14,7 @@ bot = telebot.TeleBot(TOKEN)
 stations = get_all_stations()
 # Список ID администраторов
 me = 562533452
-admins = [me]
+admins = []
 MAIN_ADMINS = []
 # Глобальный словарь для хранения контекста пользователей
 user_contexts = {}
@@ -74,7 +74,7 @@ def fei_menu():
 # Функция для создания меню главного администратора
 def EMPEROR_menu():
     markup = types.ReplyKeyboardMarkup(one_time_keyboard=True)
-    markup.add('Добавить команду','Удалить команду', 'Редактировать баланс', 'Изменить акции', 'Изменить акции%', 'Главное меню')
+    markup.add('Добавить команду','Удалить команду', 'Редактировать баланс', 'Изменить акции', 'Изменить акции%', 'Главное меню', 'Убить человека')
     return markup
 
 # Функция для создания меню выбора действия (перевод и т.д.)
@@ -109,6 +109,14 @@ def get_all_commands() -> list:
 # Хендлер для команды /start
 @bot.message_handler(commands=['start'])
 def start(message):
+    user_id = message.from_user.id
+    username = message.from_user.username
+    if not username:
+        username = f"user_{user_id}"
+
+    # Check if user already exists in the database
+    user_info = get_user_by_username(username)
+
     if message.from_user.id in admins:
         stations = get_all_stations()
         # Если пользователь админ, показываем список станций
@@ -122,6 +130,13 @@ def start(message):
         bot.register_next_step_handler(message, process_station_selection)
     elif message.from_user.id in MAIN_ADMINS:
         bot.send_message(message.chat.id, 'Ваше святейшество:', reply_markup=EMPEROR_menu())
+    elif user_info:
+        # User already exists, show main menu instead of team selection
+        command_id = user_info[1]  # Assuming user_info returns (user_id, username, command_id)
+        command_name = get_command_name_by_id(command_id)
+        bot.send_message(message.chat.id,
+                         f"Вы уже зарегистрированы в команде '{command_name}'. Изменение команды невозможно.")
+        main_menu(message.chat.id)
     else:
         # Если пользователь не админ, показываем список команд из базы данных
         commands = get_all_commands()
