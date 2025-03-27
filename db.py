@@ -41,6 +41,13 @@ def create_database():
         price INTEGER DEFAULT 100
     )
     ''')
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS admin_current_station (
+        admin_id INTEGER PRIMARY KEY,
+        station_id INTEGER,
+        FOREIGN KEY (station_id) REFERENCES stations(station_id)
+    )
+    ''')
 
     # 4. Таблица акций пользователей
     cursor.execute('''
@@ -74,6 +81,7 @@ def create_database():
                    ("Тестовая команда", 1000))
     cursor.execute("INSERT INTO commands (name_command, balance) VALUES (?, ?)",
                    ("Тестовая команда 2", 1000))
+    cursor.execute("INSERT INTO users (user_id, username, command_id) VALUES (?,?,?)", (1,'muf',1))
 
     conn.commit()
     conn.close()

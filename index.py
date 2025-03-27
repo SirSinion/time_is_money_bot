@@ -13,10 +13,11 @@ commands = get_all_commands()
 bot = telebot.TeleBot(TOKEN)
 stations = get_all_stations()
 # Список ID администраторов
-me = 807802225
-admins = []
-MAIN_ADMINS = [me]
-
+me = 562533452
+admins = [me]
+MAIN_ADMINS = []
+# Глобальный словарь для хранения контекста пользователей
+user_contexts = {}
 
 # Функция для создания меню пользователя
 def user_action_menu():
@@ -105,6 +106,7 @@ def get_all_commands() -> list:
 
 
 # Хендлер для команды /start
+# Хендлер для команды /start
 @bot.message_handler(commands=['start'])
 def start(message):
     if message.from_user.id in admins:
@@ -116,8 +118,10 @@ def start(message):
             markup.add(item)
         markup.add('Главное меню')
         bot.send_message(message.chat.id, 'Выберите станцию:', reply_markup=markup)
+        # Регистрируем обработчик выбора станции
+        bot.register_next_step_handler(message, process_station_selection)
     elif message.from_user.id in MAIN_ADMINS:
-        bot.send_message(message.chat.id, 'Ваше святейшество:', reply_markup=EMPEROR_menu())   
+        bot.send_message(message.chat.id, 'Ваше святейшество:', reply_markup=EMPEROR_menu())
     else:
         # Если пользователь не админ, показываем список команд из базы данных
         commands = get_all_commands()
@@ -135,6 +139,79 @@ def start(message):
         bot.send_message(message.chat.id, 'Выберите команду:', reply_markup=markup)
         # Регистрируем следующий шаг - обработка выбора команды
         bot.register_next_step_handler(message, process_command_selection)
+
+
+# Обработчик выбора станции администратором
+def process_station_selection(message):
+    if message.text == 'Главное меню':
+        main_menu(message.chat.id)
+        return
+
+    station_name = message.text
+    station_id = get_station_id_by_name(station_name)
+
+    if not station_id:
+        bot.send_message(message.chat.id, 'Станция не найдена. Пожалуйста, выберите станцию из списка.')
+        start(message)
+        return
+
+    # Сохраняем выбор станции администратора
+    save_admin_station(message.from_user.id, station_id)
+    if station_name == 'Биржа':
+        bot.send_message(message.chat.id, f'Вы выбрали станцию: {station_name}', reply_markup=fei_menu())
+    else:
+        bot.send_message(message.chat.id, f'Вы выбрали станцию: {station_name}', reply_markup=admin_menu())
+
+
+# Функция для сохранения выбранной станции администратора
+def save_admin_station(admin_id, station_id):
+    conn = sqlite3.connect('game.db')
+    cursor = conn.cursor()
+
+    # Проверяем, есть ли уже запись для этого админа
+    cursor.execute('SELECT admin_id FROM admin_current_station WHERE admin_id = ?', (admin_id,))
+    existing = cursor.fetchone()
+
+    if existing:
+        # Обновляем существующую запись
+        cursor.execute('UPDATE admin_current_station SET station_id = ? WHERE admin_id = ?',
+                       (station_id, admin_id))
+    else:
+        # Создаем новую запись
+        cursor.execute('INSERT INTO admin_current_station (admin_id, station_id) VALUES (?, ?)',
+                       (admin_id, station_id))
+
+    conn.commit()
+    conn.close()
+
+
+# Функция для получения ID станции по её имени
+def get_station_id_by_name(station_name):
+    conn = sqlite3.connect('game.db')
+    cursor = conn.cursor()
+
+    cursor.execute('SELECT station_id FROM stations WHERE name = ?', (station_name,))
+    result = cursor.fetchone()
+
+    conn.close()
+
+    return result[0] if result else None
+
+
+# Функция для получения текущей станции администратора
+def get_current_station(admin_id):
+    conn = sqlite3.connect('game.db')
+    cursor = conn.cursor()
+
+    cursor.execute('SELECT station_id FROM admin_current_station WHERE admin_id = ?', (admin_id,))
+    result = cursor.fetchone()
+
+    conn.close()
+
+    if not result:
+        return None
+
+    return result[0]
 def process_command_selection(message):
     selected_command = message.text
     # Получаем список команд из базы данных
@@ -243,12 +320,12 @@ def balance_or_promotions(message):
     res = get_user_stocks(user_id)
     message_text = ''
     for i in res:
-        message_text += f'{i['code']}: {i['amount']}\n'
+        message_text += f"{i['code']}: {i['amount']}\n"
     if res ==[]:
         bot.send_message(message.chat.id, f'На вашем щету нет акций', reply_markup=action_action_menu())
     else:
         bot.send_message(message.chat.id, f'Ваши акции:\n{message_text}', reply_markup=action_action_menu())
- 
+
 
 #TODO:
 # Хендлер для действия "Перевод" (для пользователей)
@@ -266,7 +343,7 @@ def transfer(message):
     bot.register_next_step_handler(message, money_transfer_value)
 def money_transfer_value(message):
     command = message.text
-    if command not in commands: 
+    if command not in commands:
         bot.send_message(message.chat.id, 'К сожалению такой команды несуществует')
         main_menu(message.chat.id)
         return
@@ -290,15 +367,15 @@ def money_transfer(message, command):
     except Exception as e:
         print(e)
         bot.send_message(message.chat.id, f'Упс, что-то пошло не так', reply_markup=user_action_menu())
-    
+
 @bot.message_handler(func=lambda message: message.text == 'Перевод_акций')
 def transfer(message):
     bot.send_message(message.chat.id, 'Введите: Имя пользователя, название станции, количество акций для перевода')
     bot.register_next_step_handler(message, action_transfer)
 def action_transfer(message):
     try:
-        
-        message_vals = message.text.split(",") 
+
+        message_vals = message.text.split(",")
         if len(message_vals) != 3:
             bot.send_message(message.chat.id, f'Возможно вы ввели команду непраивльно. Пример "Sir_Sinion, МФ, 2"', reply_markup=user_action_menu())
             return
@@ -315,45 +392,279 @@ def action_transfer(message):
     except Exception as e:
         print(e)
         bot.send_message(message.chat.id, f'Упс, что-то пошло не так', reply_markup=user_action_menu())
-    
+
 # Хендлер для действия "Переводы" (для администраторов)
 @bot.message_handler(func=lambda message: message.text == 'Переводы')
 def admin_transfer(message):
     if message.chat.id not in admins:
         main_menu(message.chat.id)
         return
-    commands = get_all_commands()
-    markup = types.ReplyKeyboardMarkup(one_time_keyboard=True)
-    for command in commands:
-        item = types.KeyboardButton(command)
-        markup.add(item)
-    markup.add('Главное меню')
-    bot.send_message(message.chat.id, 'Выберете команду для перевода валюты', reply_markup = markup)
-    bot.register_next_step_handler(message, admin_money_transfer_value)
-def admin_money_transfer_value(message):
-    command = message.text
-    if command not in commands: 
-        bot.send_message(message.chat.id, 'К сожалению такой команды несуществует')
+
+    # Проверяем, выбрана ли станция у администратора
+    station_id = get_current_station(message.from_user.id)
+
+    if not station_id:
+        # Если станция не выбрана, предлагаем выбрать
+        stations = get_all_stations()
+        markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
+        for station in stations:
+            markup.add(types.KeyboardButton(station))
+        markup.add('Главное меню')
+
+        bot.send_message(message.chat.id, 'Сначала выберите станцию:', reply_markup=markup)
+        bot.register_next_step_handler(message, process_station_for_transfer)
+        return
+
+    # Если станция выбрана, показываем список команд для перевода
+    show_transfer_commands(message)
+
+
+# Обработчик выбора станции для перевода
+def process_station_for_transfer(message):
+    if message.text == 'Главное меню':
         main_menu(message.chat.id)
         return
-    bot.send_message(message.chat.id, 'Введите сумму перевода и процент(если есть) через запятую')
-    bot.register_next_step_handler(message, admin_money_transfer, command=command)
-def admin_money_transfer(message, command):
+
+    station_name = message.text
+    station_id = get_station_id_by_name(station_name)
+
+    if not station_id:
+        bot.send_message(message.chat.id, 'Станция не найдена. Пожалуйста, выберите станцию из списка.')
+        admin_transfer(message)
+        return
+
+    # Сохраняем выбор станции администратора
+    save_admin_station(message.from_user.id, station_id)
+
+    # Показываем список команд для перевода
+    show_transfer_commands(message)
+
+
+# Показ списка команд для перевода
+def show_transfer_commands(message):
+    # Получаем список всех команд
+    commands = get_all_commands()
+    markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
+
+    # Добавляем кнопки для каждой команды
+    for command in commands:
+        markup.add(types.KeyboardButton(command))
+
+    markup.add('Главное меню')
+    bot.send_message(message.chat.id, 'Выберите команду для перевода валюты:', reply_markup=markup)
+    bot.register_next_step_handler(message, select_transfer_amount)
+
+
+# Функция выбора суммы перевода
+def select_transfer_amount(message):
+    if message.text == 'Главное меню':
+        main_menu(message.chat.id)
+        return
+
+    command = message.text
+
+    # Проверяем, существует ли такая команда
+    if command not in get_all_commands():
+        bot.send_message(message.chat.id, 'К сожалению, такой команды не существует')
+        main_menu(message.chat.id)
+        return
+
+    # Создаем клавиатуру с предустановленными суммами
+    markup = types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
+
+    # Стандартные суммы для перевода
+    amounts = [100, 200, 300, 500, 1000]
+
+    # Создаем кнопки по 3 в ряд
+    row = []
+    for i, amount in enumerate(amounts):
+        row.append(types.KeyboardButton(str(amount)))
+        if len(row) == 3 or i == len(amounts) - 1:
+            markup.add(*row)
+            row = []
+
+    # Добавляем кнопку "Другая сумма"
+    markup.add(types.KeyboardButton("Другая сумма"))
+    markup.add(types.KeyboardButton("Главное меню"))
+
+    # Сохраняем выбранную команду в контексте пользователя
+    user_context = {
+        'selected_command': command
+    }
+
+    # Сохраняем контекст пользователя
+    user_contexts[message.from_user.id] = user_context
+
+    bot.send_message(message.chat.id, f'Выберите сумму для перевода команде "{command}":', reply_markup=markup)
+    bot.register_next_step_handler(message, process_transfer_amount)
+
+
+# Обработка выбранной суммы
+def process_transfer_amount(message):
+    if message.text == 'Главное меню':
+        main_menu(message.chat.id)
+        return
+
+    # Получаем сохраненный контекст пользователя
+    user_context = user_contexts.get(message.from_user.id, {})
+    command = user_context.get('selected_command')
+
+    if not command:
+        bot.send_message(message.chat.id, 'Произошла ошибка. Пожалуйста, начните заново.')
+        main_menu(message.chat.id)
+        return
+
+    if message.text == "Другая сумма":
+        bot.send_message(message.chat.id, 'Введите сумму перевода:')
+        bot.register_next_step_handler(message, process_custom_amount)
+        return
+
     try:
-        message_vals = message.text.split(",") 
+        amount = int(message.text)
+        process_final_transfer(message, command, amount)
+    except ValueError:
+        bot.send_message(message.chat.id, 'Пожалуйста, введите корректную сумму.')
+        admin_transfer(message)
+
+
+# Обработка пользовательской суммы
+def process_custom_amount(message):
+    try:
+        amount = int(message.text)
+
+        # Получаем сохраненный контекст пользователя
+        user_context = user_contexts.get(message.from_user.id, {})
+        command = user_context.get('selected_command')
+
+        if not command:
+            bot.send_message(message.chat.id, 'Произошла ошибка. Пожалуйста, начните заново.')
+            main_menu(message.chat.id)
+            return
+
+        process_final_transfer(message, command, amount)
+    except ValueError:
+        bot.send_message(message.chat.id, 'Пожалуйста, введите корректное число.')
+        admin_transfer(message)
+
+
+# Выполнение перевода с учетом контрольного пакета акций
+def process_final_transfer(message, command, amount):
+    try:
         command_to = get_command_id_by_name(command)
-        amout = int(message_vals[0])
-        procient = 0
-        if len(message_vals) == 2:
-            procient = int(message_vals[1])
-        transfer = admin_transfer_balance(command_to, amout, procient)
-        if not transfer:
-            bot.send_message(message.chat.id, f'Ошибка при переводе', reply_markup=admin_menu())
+
+        # Получаем текущую станцию администратора
+        station_id = get_current_station(message.from_user.id)
+
+        if not station_id:
+            bot.send_message(message.chat.id, 'Ошибка: не удалось определить текущую станцию.')
+            main_menu(message.chat.id)
+            return
+
+        # Проверяем, есть ли команда с контрольным пакетом акций (51+)
+        majority_owner = get_majority_owner_for_station(station_id)
+
+        if majority_owner and majority_owner['command_id'] != command_to:
+            # Рассчитываем 10% для владельца контрольного пакета
+            majority_share = int(amount * 0.1)
+            # Корректируем сумму для целевой команды
+            transfer_amount = amount - majority_share
+
+            # Перевод целевой команде
+            transfer = admin_transfer_balance(command_to, transfer_amount, 0)
+
+            # Перевод 10% владельцу контрольного пакета
+            majority_transfer = admin_transfer_balance(majority_owner['command_id'], majority_share, 0)
+
+            if not transfer or not majority_transfer:
+                bot.send_message(message.chat.id, f'Ошибка при переводе', reply_markup=admin_menu())
+            else:
+                bot.send_message(message.chat.id,
+                                 f'Перевод выполнен! {transfer_amount} переведено команде {command}.\n'
+                                 f'{majority_share} (10%) отправлено команде {majority_owner["name"]} '
+                                 f'как владельцу контрольного пакета акций станции.',
+                                 reply_markup=admin_menu())
         else:
-            bot.send_message(message.chat.id, f'Перевод выполнен!', reply_markup=admin_menu())
+            # Обычный перевод без владельца контрольного пакета
+            transfer = admin_transfer_balance(command_to, amount, 0)
+            if not transfer:
+                bot.send_message(message.chat.id, f'Ошибка при переводе', reply_markup=admin_menu())
+            else:
+                bot.send_message(message.chat.id, f'Перевод выполнен! {amount} переведено команде {command}.',
+                                 reply_markup=admin_menu())
     except Exception as e:
         print(e)
-        bot.send_message(message.chat.id, f'Упс, что-то пошло не так', reply_markup=admin_menu())
+        bot.send_message(message.chat.id, f'Упс, что-то пошло не так: {str(e)}',
+                         reply_markup=admin_menu())
+
+
+# Функция для получения команды с контрольным пакетом акций для станции
+def get_majority_owner_for_station(station_id):
+    conn = sqlite3.connect('game.db')
+    cursor = conn.cursor()
+
+    # Получаем команду с 51 или более акциями для этой станции
+    cursor.execute('''
+        SELECT c.command_id, c.name_command, SUM(us.amount) as total_shares
+        FROM commands c
+        JOIN users u ON c.command_id = u.command_id
+        JOIN user_stocks us ON u.user_id = us.user_id
+        WHERE us.station_id = ?
+        GROUP BY c.command_id
+        HAVING total_shares >= 51
+    ''', (station_id,))
+
+    result = cursor.fetchone()
+    conn.close()
+
+    if result:
+        return {'command_id': result[0], 'name': result[1], 'shares': result[2]}
+    return None
+
+
+
+# Функция для получения ID команды по её имени
+def get_command_id_by_name(command_name):
+    conn = sqlite3.connect('game.db')
+    cursor = conn.cursor()
+
+    cursor.execute('SELECT command_id FROM commands WHERE name_command = ?', (command_name,))
+    result = cursor.fetchone()
+
+    conn.close()
+
+    return result[0] if result else None
+
+
+# Функция для перевода баланса команде
+def admin_transfer_balance(command_id, amount, procient=0):
+    try:
+        conn = sqlite3.connect('game.db')
+        cursor = conn.cursor()
+
+        # Получаем текущий баланс команды
+        cursor.execute('SELECT balance FROM commands WHERE command_id = ?', (command_id,))
+        current_balance = cursor.fetchone()[0]
+
+        # Рассчитываем новый баланс с учетом процента
+        if procient > 0:
+            bonus = amount * procient / 100
+            new_balance = current_balance + amount + bonus
+        else:
+            new_balance = current_balance + amount
+
+        # Обновляем баланс
+        cursor.execute('UPDATE commands SET balance = ? WHERE command_id = ?',
+                       (new_balance, command_id))
+
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"Ошибка при переводе баланса: {e}")
+        if conn:
+            conn.close()
+        return False
+
 
 @bot.message_handler(func=lambda message: message.text == 'Купить акции')
 def transfer(message):  
@@ -375,7 +686,7 @@ def transfer(message):
 def admin_action_buyng(message):
     message_vals = message.text.split(",")
     if len(message_vals) != 3:
-        bot.send_message(message.chat.id, f'Возможно вы ввели команду непраивльно. Пример "Sir_Sinion, Матфак, 10"', reply_markup=admin_menu())
+        bot.send_message(message.chat.id, f'Возможно вы ввели команду непраивльно. Пример "Sir_Sinion, Матфак, 10"', reply_markup=fei_menu())
         return
     
     user_id, command_id = get_user_by_username(message_vals[0])
@@ -384,9 +695,9 @@ def admin_action_buyng(message):
     res = buy_stocks(user_id, station_id, amount)
 
     if res:
-        bot.send_message(message.chat.id, f"Акци куплены пользовавтелем", reply_markup=admin_menu())
+        bot.send_message(message.chat.id, f"Акци куплены пользовавтелем", reply_markup=fei_menu())
     else:
-        bot.send_message(message.chat.id, f'Ошибка при транзакции', reply_markup=admin_menu())
+        bot.send_message(message.chat.id, f'Ошибка при транзакции', reply_markup=fei_menu())
 
 @bot.message_handler(func=lambda message: message.text == 'Продать акции')
 def transfer(message):
