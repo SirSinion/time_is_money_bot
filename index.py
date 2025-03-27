@@ -15,7 +15,7 @@ stations = get_all_stations()
 # Список ID администраторов
 me = 807802225
 admins = []
-MAIN_ADMINS = []
+MAIN_ADMINS = [me]
 
 
 # Функция для создания меню пользователя
@@ -468,19 +468,18 @@ def change_actions(message):
         markup.add(item)
     markup.add('Главное меню')
     bot.send_message(message.chat.id,"Выберете станцию, для изменения акций", reply_markup=markup)
-    bot.register_next_step_handler(message, change_actions_procent)
-def change_actions_procent(message):
+    bot.register_next_step_handler(message, change_actions_value)
+def change_actions_value(message):
     if message.text not in get_all_stationscode():
         bot.send_message(message.chat.id,"Такой станции нет", reply_markup=EMPEROR_menu())
         return
-    bot.send_message(message.chat.id,"Введите процент изменения")
+    bot.send_message(message.chat.id,"Введите новую цену акций")
     bot.register_next_step_handler(message, change_actions_fin, station=message.text)
 def change_actions_fin(message, station):
     station_id = get_station_by_stationcode(station)
     try:
-        procent = int(message.text)
-        
-        update_stock_price(station_id,)
+        new_walut = int(message.text)
+        update_stock_price(station_id, new_walut)
         bot.send_message(message.chat.id,"Успешно!", reply_markup=EMPEROR_menu())
     except Exception as e:
         print(e)
@@ -501,8 +500,8 @@ def change_actions_procent(message):
         bot.send_message(message.chat.id,"Такой станции нет", reply_markup=EMPEROR_menu())
         return
     bot.send_message(message.chat.id,"Введите процент изменения")
-    bot.register_next_step_handler(message, change_actions_fin, station=message.text)
-def change_actions_fin(message, station):
+    bot.register_next_step_handler(message, change_actions_procent_fin, station=message.text)
+def change_actions_procent_fin(message, station):
     station_id = get_station_by_stationcode(station)
     try:
         procent = int(message.text)/100
