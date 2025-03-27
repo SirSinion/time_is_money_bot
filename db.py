@@ -203,6 +203,16 @@ def add_command(name_command: str, initial_balance: int = 0) -> int:
         conn.close()
 
 
+def remove_command(name_command: str):
+    conn = sqlite3.connect('game.db')
+    cursor = conn.cursor()
+    if name_command in get_all_commands():
+        cursor.execute("DELETE FROM commands WHERE name_command = '" + name_command + "'")
+        conn.commit()
+        return True
+    else:
+        return False
+
 def add_user(username: str, command_id: int) -> int:
     """
     Добавляет нового пользователя в базу данных.
@@ -1239,6 +1249,18 @@ def get_station_stocks_distribution(station_id: int) -> List[dict]:
         close_db(conn, commit=False)
         return []
 
+def get_station_cost(station_code):
+
+    conn, cursor = connect_db()
+    cursor.execute("SELECT price FROM stations WHERE code = ?", (station_code,))
+    station_result = cursor.fetchone()[0]
+    if not station_result:
+            print(f"Станция с ID {station_code} не найдена")
+            close_db(conn, commit=False)
+            return False
+    
+    close_db(conn)
+    return station_result
 
 def update_stock_price(station_id: int, new_price: int) -> bool:
     """

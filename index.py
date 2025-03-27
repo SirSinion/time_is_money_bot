@@ -6,15 +6,16 @@ from config import TOKEN
 from db import add_user, get_all_commands, get_all_stations, get_command_id_by_name, get_user_by_username, \
     update_user_command, get_command_info, format_command_info, get_balance, get_user_command_id, get_command_name_by_id, \
     transfer_balance, admin_transfer_balance, buy_stocks, get_station_by_stationcode, get_all_stationscode,\
-    get_available_stocks, sell_stocks, get_user_stocks, transfer_stocks
+    get_available_stocks, sell_stocks, get_user_stocks, transfer_stocks, add_command, remove_command, \
+    update_stock_price, get_station_cost
 
 commands = get_all_commands()
 bot = telebot.TeleBot(TOKEN)
 stations = get_all_stations()
 # Список ID администраторов
-MAIN_ADMIN = 1
 me = 807802225
 admins = []
+MAIN_ADMINS = []
 
 
 # Функция для создания меню пользователя
@@ -69,6 +70,12 @@ def fei_menu():
     markup.add('Купить акции','Продать акции', 'Главное меню')
     return markup
 
+# Функция для создания меню главного администратора
+def EMPEROR_menu():
+    markup = types.ReplyKeyboardMarkup(one_time_keyboard=True)
+    markup.add('Добавить команду','Удалить команду', 'Редактировать баланс', 'Изменить акции', 'Изменить акции%', 'Главное меню')
+    return markup
+
 # Функция для создания меню выбора действия (перевод и т.д.)
 def action_menu():
     markup = types.ReplyKeyboardMarkup(one_time_keyboard=True)
@@ -109,6 +116,8 @@ def start(message):
             markup.add(item)
         markup.add('Главное меню')
         bot.send_message(message.chat.id, 'Выберите станцию:', reply_markup=markup)
+    elif message.from_user.id in MAIN_ADMINS:
+        bot.send_message(message.chat.id, 'Ваше святейшество:', reply_markup=EMPEROR_menu())   
     else:
         # Если пользователь не админ, показываем список команд из базы данных
         commands = get_all_commands()
@@ -234,7 +243,7 @@ def balance_or_promotions(message):
     res = get_user_stocks(user_id)
     message_text = ''
     for i in res:
-        message_text += f"{i['code']}: {i['amount']}\n"
+        message_text += f'{i['code']}: {i['amount']}\n'
     if res ==[]:
         bot.send_message(message.chat.id, f'На вашем щету нет акций', reply_markup=action_action_menu())
     else:
@@ -267,6 +276,9 @@ def money_transfer(message, command):
     try:
         command_to = get_command_id_by_name(command)
         amout = int(message.text)
+        if amout < 0:
+            bot.send_message(message.chat.id, f'Так не получится', reply_markup=user_action_menu())
+            return
         user_data = get_user_by_username(message.from_user.username)
         user_id, command_id = user_data
 
@@ -307,15 +319,17 @@ def action_transfer(message):
 # Хендлер для действия "Переводы" (для администраторов)
 @bot.message_handler(func=lambda message: message.text == 'Переводы')
 def admin_transfer(message):
+    if message.chat.id not in admins:
+        main_menu(message.chat.id)
+        return
     commands = get_all_commands()
     markup = types.ReplyKeyboardMarkup(one_time_keyboard=True)
     for command in commands:
         item = types.KeyboardButton(command)
         markup.add(item)
     markup.add('Главное меню')
-    bot.send_message(message.chat.id, 'Выберете команду для перевода валюты', reply_markup=markup)
+    bot.send_message(message.chat.id, 'Выберете команду для перевода валюты', reply_markup = markup)
     bot.register_next_step_handler(message, admin_money_transfer_value)
-
 def admin_money_transfer_value(message):
     command = message.text
     if command not in commands: 
@@ -324,27 +338,15 @@ def admin_money_transfer_value(message):
         return
     bot.send_message(message.chat.id, 'Введите сумму перевода и процент(если есть) через запятую')
     bot.register_next_step_handler(message, admin_money_transfer, command=command)
-
-
 def admin_money_transfer(message, command):
     try:
-        message_vals = message.text.split(",")
+        message_vals = message.text.split(",") 
         command_to = get_command_id_by_name(command)
-        amount = int(message_vals[0])
+        amout = int(message_vals[0])
         procient = 0
         if len(message_vals) == 2:
             procient = int(message_vals[1])
-
-        # Получаем станцию, выбранную администратором
-        station_name = admin_stations.get(message.from_user.id)
-        station_id = None
-
-        if station_name:
-            station_id = get_station_by_stationcode(station_name)
-
-        # Модифицируем функцию admin_transfer_balance, чтобы она принимала station_id
-        transfer = admin_transfer_balance(command_to, amount, procient, station_id)
-
+        transfer = admin_transfer_balance(command_to, amout, procient)
         if not transfer:
             bot.send_message(message.chat.id, f'Ошибка при переводе', reply_markup=admin_menu())
         else:
@@ -353,11 +355,12 @@ def admin_money_transfer(message, command):
         print(e)
         bot.send_message(message.chat.id, f'Упс, что-то пошло не так', reply_markup=admin_menu())
 
-
 @bot.message_handler(func=lambda message: message.text == 'Купить акции')
 def transfer(message):  
     if message.chat.id not in admins:
+        bot.send_message(message.chat.id, "АГАА, ПОПАЛСЯ ШКОЛЬНИК(ЦА), С KALI LINUX")
         main_menu(message.chat.id)
+        return
     bot.send_message(message.chat.id, f'Вы выбрали: {message.text}')
     res = get_all_stationscode()
     message_text = 'Доступные акции:'
@@ -387,6 +390,10 @@ def admin_action_buyng(message):
 
 @bot.message_handler(func=lambda message: message.text == 'Продать акции')
 def transfer(message):
+    if message.chat.id not in admins:
+        bot.send_message(message.chat.id, "АГАА, ПОПАЛСЯ ШКОЛЬНИК(ЦА), С KALI LINUX")
+        main_menu(message.chat.id)
+        return
     res = get_all_stationscode()
     message_text = 'Доступные акции:'
     for i in res:
@@ -413,24 +420,121 @@ def admin_action_selling(message):
     else:
         bot.send_message(message.chat.id, f'Ошибка при транзакции', reply_markup=fei_menu())
 
+#Хендлер самого ИМПЕРАТОРА
+@bot.message_handler(func=lambda message: message.text == 'Добавить команду')
+def create_command_select(message):
+    if message.chat.id not in MAIN_ADMINS:
+        bot.send_message(message.chat.id, "АГАА, ПОПАЛСЯ ШКОЛЬНИК(ЦА), С KALI LINUX")
+        main_menu(message.chat.id)
+        return
+    commands = get_all_commands()
+    message_text = 'Хочу напомнить что уже существуют команды:\n'
+    for command in commands:
+        message_text += str(command) + "\n"
+    bot.send_message(message.chat.id, message_text)
+    bot.send_message(message.chat.id,"Введи имя новой команды:")
+    bot.register_next_step_handler(message, create_command)
+def create_command(message):
+    
+    add_command(message.text,1000)
+    bot.send_message(message.chat.id, 'Команда добавлена', reply_markup=EMPEROR_menu())
+    
+@bot.message_handler(func=lambda message: message.text == 'Удалить команду')
+def delete_command_select(message):
+    if message.chat.id not in MAIN_ADMINS:
+        bot.send_message(message.chat.id, "АГАА, ПОПАЛСЯ ШКОЛЬНИК(ЦА), С KALI LINUX")
+        main_menu(message.chat.id)
+        return
+    commands = get_all_commands()
+    message_text = 'Хочу напомнить что уже существуют команды:\n'
+    for command in commands:
+        message_text += str(command) + "\n"
+    bot.send_message(message.chat.id, message_text)
+    bot.send_message(message.chat.id, "Введите название команды, которую хотите удалить:")
+    bot.register_next_step_handler(message, delete_command)
+def delete_command(message):
+    res = remove_command(message.text)
+    if res:
+        bot.send_message(message.chat.id, "Команда успешно удалена")
+    else:
+        bot.send_message(message.chat.id, "Возникли траблы")
 
-# Словарь для хранения текущей станции администратора
-admin_stations = {}  # {admin_id: station_name}
+@bot.message_handler(func=lambda message: message.text == 'Изменить акции')
+def change_actions(message):
+    stations = get_all_stationscode()
+    markup = types.ReplyKeyboardMarkup(one_time_keyboard=True)
+    for station in stations:
+        item = types.KeyboardButton(station)
+        markup.add(item)
+    markup.add('Главное меню')
+    bot.send_message(message.chat.id,"Выберете станцию, для изменения акций", reply_markup=markup)
+    bot.register_next_step_handler(message, change_actions_procent)
+def change_actions_procent(message):
+    if message.text not in get_all_stationscode():
+        bot.send_message(message.chat.id,"Такой станции нет", reply_markup=EMPEROR_menu())
+        return
+    bot.send_message(message.chat.id,"Введите процент изменения")
+    bot.register_next_step_handler(message, change_actions_fin, station=message.text)
+def change_actions_fin(message, station):
+    station_id = get_station_by_stationcode(station)
+    try:
+        procent = int(message.text)
+        
+        update_stock_price(station_id,)
+        bot.send_message(message.chat.id,"Успешно!", reply_markup=EMPEROR_menu())
+    except Exception as e:
+        print(e)
+        bot.send_message(message.chat.id,"Траблы, брат!", reply_markup=EMPEROR_menu())
+
+@bot.message_handler(func=lambda message: message.text == 'Изменить акции%')
+def change_actions(message):
+    stations = get_all_stationscode()
+    markup = types.ReplyKeyboardMarkup(one_time_keyboard=True)
+    for station in stations:
+        item = types.KeyboardButton(station)
+        markup.add(item)
+    markup.add('Главное меню')
+    bot.send_message(message.chat.id,"Выберете станцию, для изменения акций", reply_markup=markup)
+    bot.register_next_step_handler(message, change_actions_procent)
+def change_actions_procent(message):
+    if message.text not in get_all_stationscode():
+        bot.send_message(message.chat.id,"Такой станции нет", reply_markup=EMPEROR_menu())
+        return
+    bot.send_message(message.chat.id,"Введите процент изменения")
+    bot.register_next_step_handler(message, change_actions_fin, station=message.text)
+def change_actions_fin(message, station):
+    station_id = get_station_by_stationcode(station)
+    try:
+        procent = int(message.text)/100
+        old_price = int(get_station_cost(station)) 
+        new_price = old_price + old_price*procent
+        res = update_stock_price(station_id, int(new_price))
+        if res:
+            bot.send_message(message.chat.id,"Успешно!", reply_markup=EMPEROR_menu())
+        else:
+            raise ValueError
+    except Exception as e:
+        print(e)
+        bot.send_message(message.chat.id,"Траблы, брат!", reply_markup=EMPEROR_menu())
+
+# @bot.message_handler(func=lambda message: message.text == 'Редактировать баланс')
+# def tithing(message):
+
+
+# Хендлер для выбора станции (для администраторов)
 @bot.message_handler(func=lambda message: message.text in stations)
 def admin_station(message):
+    if message.chat.id not in admins:
+        bot.send_message(message.chat.id, "АГАА, ПОПАЛСЯ ШКОЛЬНИК(ЦА), С KALI LINUX")
+        main_menu(message.chat.id)
+        return
     selected_station = message.text
     bot.send_message(message.chat.id, f'Вы выбрали станцию: {selected_station}')
-
-    # Сохраняем выбранную станцию для этого администратора
-    admin_stations[message.from_user.id] = selected_station
-
     if selected_station == 'Биржа':
         bot.send_message(message.chat.id, 'Теперь вы админ биржи?', reply_markup=fei_menu())
         return
-
     # Показываем кнопку "Переводы" после выбора станции
     bot.send_message(message.chat.id, 'Что бы вы хотели сделать?', reply_markup=admin_menu())
-
 
 # Хендлер для кнопки "Команда" — возвращаем пользователя в меню действий
 @bot.message_handler(func=lambda message: message.text == 'Команда')
@@ -462,6 +566,8 @@ def back_to_main_menu(message):
             markup.add(item)
         markup.add('Главное меню')
         bot.send_message(message.chat.id, 'Выберите станцию:', reply_markup=markup)
+    elif message.from_user.id in MAIN_ADMINS:
+        bot.send_message(message.chat.id, 'Главное меню:', reply_markup=EMPEROR_menu())        
     else:
         # Для обычного пользователя показываем меню после выбора команды
         bot.send_message(message.chat.id, 'Что бы вы хотели сделать?', reply_markup=user_action_menu())
