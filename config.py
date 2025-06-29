@@ -1,4 +1,1 @@
-DATABASE = 'tutorial.db'
-ACTIVS_TABLE_NAME = "blanks"
-USERS_TABLE_NAME = "users"
-TOKEN = '7690563368:AAGbrhslXKcCqvPgJ8QByW0Y2fAzO8unzUA'
+
